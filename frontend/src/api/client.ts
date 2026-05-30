@@ -289,3 +289,448 @@ export type OvNode = {
   abstract?: string;
   [key: string]: unknown;
 };
+
+/* ═══════════════════════════════════════════════════════════
+   HERMES API SERVER — types + helpers + functions
+   All calls go through /api/hermes_api (Ultron proxy)
+   The bearer secret never reaches the browser.
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Types ──────────────────────────────────────────────── */
+
+export type HermesMessageContentPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string; detail?: string } };
+
+export type HermesChatMessage = {
+  role: "user" | "assistant" | "system" | "tool";
+  content: string | HermesMessageContentPart[];
+};
+
+export type HermesRunStatus = {
+  object: string;
+  run_id: string;
+  status: "started" | "running" | "completed" | "failed" | "cancelled" | "stopping";
+  session_id?: string | null;
+  model?: string | null;
+  output?: string | null;
+  usage?: { input_tokens: number; output_tokens: number; total_tokens: number } | null;
+};
+
+export type HermesJob = {
+  id: string;
+  prompt: string;
+  schedule?: string | null;
+  status?: string | null;
+  last_run?: string | null;
+  next_run?: string | null;
+  [key: string]: unknown;
+};
+
+export type HermesAgentSession = {
+  id: string;
+  title?: string | null;
+  source?: string | null;
+  model?: string | null;
+  started_at?: string | null;
+  ended_at?: string | null;
+  end_reason?: string | null;
+  message_count?: number | null;
+  [key: string]: unknown;
+};
+
+export type HermesCapabilities = {
+  object: string;
+  platform: string;
+  model: string;
+  auth: { type: string; required: boolean };
+  features: Record<string, boolean>;
+  [key: string]: unknown;
+};
+
+export type HermesSkill = {
+  name: string;
+  description?: string | null;
+  category?: string | null;
+  [key: string]: unknown;
+};
+
+export type HermesToolset = {
+  name: string;
+  label?: string | null;
+  description?: string | null;
+  enabled: boolean;
+  configured: boolean;
+  tools: string[];
+  [key: string]: unknown;
+};
+
+export type SseEvent = { event: string; data: string };
+
+/* ── SSE stream helpers ──────────────────────────────────── */
+
+/**
+ * Parses a ReadableStream of bytes into SSE events.
+ * Works for both GET and POST SSE streams (unlike EventSource which is GET-only).
+ */
+export async function* parseSseStream(
+  body: ReadableStream<Uint8Array>,
+  signal?: AbortSignal,
+): AsyncGenerator<SseEvent> {
+  const reader = body.getReader();
+  const dec = new TextDecoder();
+  let buf = "";
+  try {
+    while (true) {
+      if (signal?.aborted) break;
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const parts = buf.split("\n\n");
+      buf = parts.pop() ?? "";
+      for (const part of parts) {
+        const ev: SseEvent = { event: "message", data: "" };
+        for (const line of part.split("\n")) {
+          if (line.startsWith("event: ")) ev.event = line.slice(7).trim();
+          else if (line.startsWith("data: "))
+            ev.data = ev.data ? ev.data + "\n" + line.slice(6) : line.slice(6);
+        }
+        if (ev.data) yield ev;
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+async function _ssePost(url: string, body: unknown, signal?: AbortSignal): Promise<ReadableStream<Uint8Array>> {
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    signal,
+  });
+  if (!resp.ok || !resp.body) {
+    const text = await resp.text().catch(() => "");
+    throw new Error(`Stream failed (${resp.status}): ${text}`);
+  }
+  return resp.body;
+}
+
+async function _sseGet(url: string, signal?: AbortSignal): Promise<ReadableStream<Uint8Array>> {
+  const resp = await fetch(url, { signal });
+  if (!resp.ok || !resp.body) {
+    const text = await resp.text().catch(() => "");
+    throw new Error(`Stream failed (${resp.status}): ${text}`);
+  }
+  return resp.body;
+}
+
+/* ── Chat streaming helper ───────────────────────────────── */
+
+export type ChatStreamChunk =
+  | { kind: "text"; text: string }
+  | { kind: "tool_progress"; content: string }
+  | { kind: "done"; usage?: unknown };
+
+/**
+ * Streams a chat completion from Hermes via POST /api/hermes_api/v1/chat/completions.
+ * Handles hermes.tool.progress events and standard OpenAI delta chunks.
+ */
+export async function* hermesChatStream(
+  messages: HermesChatMessage[],
+  signal?: AbortSignal,
+  sessionKey?: string,
+): AsyncGenerator<ChatStreamChunk> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (sessionKey) headers["X-Hermes-Session-Key"] = sessionKey;
+  const resp = await fetch("/api/hermes_api/v1/chat/completions", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ model: "hermes-agent", messages, stream: true }),
+    signal,
+  });
+  if (!resp.ok || !resp.body) {
+    const text = await resp.text().catch(() => "");
+    throw new Error(`Chat stream failed (${resp.status}): ${text}`);
+  }
+  for await (const ev of parseSseStream(resp.body, signal)) {
+    if (ev.event === "hermes.tool.progress") {
+      let content = ev.data;
+      try {
+        const parsed = JSON.parse(ev.data) as Record<string, unknown>;
+        content = String(parsed.content ?? parsed.message ?? parsed.tool ?? ev.data);
+      } catch { /* raw string */ }
+      yield { kind: "tool_progress", content };
+    } else if (ev.event === "error") {
+      let msg = ev.data;
+      try { msg = (JSON.parse(ev.data) as { error?: string }).error ?? ev.data; } catch { /* keep raw */ }
+      throw new Error(msg);
+    } else if (ev.data === "[DONE]") {
+      yield { kind: "done" };
+    } else {
+      try {
+        const chunk = JSON.parse(ev.data) as {
+          choices?: Array<{ delta?: { content?: string }; finish_reason?: string }>;
+          usage?: unknown;
+        };
+        const text = chunk.choices?.[0]?.delta?.content;
+        if (text) yield { kind: "text", text };
+        if (chunk.choices?.[0]?.finish_reason) yield { kind: "done", usage: chunk.usage };
+      } catch { /* ignore parse errors on non-JSON data lines */ }
+    }
+  }
+}
+
+/* ── Run events streaming helper ─────────────────────────── */
+
+export type RunStreamEvent =
+  | { kind: "token"; text: string }
+  | { kind: "tool"; content: string }
+  | { kind: "status"; status: string }
+  | { kind: "done"; output?: string }
+  | { kind: "error"; message: string };
+
+export async function* hermesRunEventStream(
+  runId: string,
+  signal?: AbortSignal,
+): AsyncGenerator<RunStreamEvent> {
+  const body = await _sseGet(`/api/hermes_api/v1/runs/${runId}/events`, signal);
+  for await (const ev of parseSseStream(body, signal)) {
+    if (ev.event === "error") {
+      let msg = ev.data;
+      try { msg = (JSON.parse(ev.data) as { error?: string }).error ?? ev.data; } catch { /* keep raw */ }
+      yield { kind: "error", message: msg };
+    } else {
+      try {
+        const data = JSON.parse(ev.data) as Record<string, unknown>;
+        if (ev.event === "run.completed" || (data as { status?: string }).status === "completed") {
+          yield { kind: "done", output: String(data.output ?? "") };
+        } else if (ev.event === "tool.started" || ev.event === "tool.completed") {
+          yield { kind: "tool", content: ev.data };
+        } else if (typeof data.delta === "string") {
+          yield { kind: "token", text: data.delta };
+        } else {
+          yield { kind: "status", status: ev.event };
+        }
+      } catch {
+        yield { kind: "status", status: ev.data };
+      }
+    }
+  }
+}
+
+/* ── Session chat streaming helper ──────────────────────── */
+
+export async function* hermesSessionChatStream(
+  sessionId: string,
+  input: string,
+  signal?: AbortSignal,
+): AsyncGenerator<ChatStreamChunk> {
+  const body = await _ssePost(
+    `/api/hermes_api/sessions/${sessionId}/chat/stream`,
+    { input },
+    signal,
+  );
+  for await (const ev of parseSseStream(body, signal)) {
+    if (ev.event === "error") {
+      let msg = ev.data;
+      try { msg = (JSON.parse(ev.data) as { error?: string }).error ?? ev.data; } catch { /* keep raw */ }
+      throw new Error(msg);
+    } else if (ev.event === "assistant.delta") {
+      try {
+        const d = JSON.parse(ev.data) as { text?: string };
+        if (d.text) yield { kind: "text", text: d.text };
+      } catch { yield { kind: "text", text: ev.data }; }
+    } else if (ev.event === "tool.started" || ev.event === "tool.completed") {
+      yield { kind: "tool_progress", content: ev.data };
+    } else if (ev.event === "run.completed") {
+      yield { kind: "done" };
+    }
+  }
+}
+
+/* ── Health & discovery ──────────────────────────────────── */
+
+export async function hermesApiHealth() {
+  return request<{ status: string }>("/api/hermes_api/health");
+}
+
+export async function hermesApiHealthDetailed() {
+  return request<Record<string, unknown>>("/api/hermes_api/health/detailed");
+}
+
+export async function hermesApiModels() {
+  return request<{ data: Array<{ id: string }> }>("/api/hermes_api/v1/models");
+}
+
+export async function hermesApiCapabilities() {
+  return request<HermesCapabilities>("/api/hermes_api/v1/capabilities");
+}
+
+export async function hermesApiSkills() {
+  return request<HermesSkill[]>("/api/hermes_api/v1/skills");
+}
+
+export async function hermesApiToolsets() {
+  return request<HermesToolset[]>("/api/hermes_api/v1/toolsets");
+}
+
+/* ── Chat completions (non-streaming) ────────────────────── */
+
+export async function hermesChatSync(messages: HermesChatMessage[]) {
+  return request<{
+    choices: Array<{ message: { role: string; content: string } }>;
+    usage?: { total_tokens: number };
+  }>("/api/hermes_api/v1/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model: "hermes-agent", messages, stream: false }),
+  });
+}
+
+/* ── Responses API ───────────────────────────────────────── */
+
+export async function hermesCreateResponse(body: {
+  input: string | unknown[];
+  instructions?: string;
+  store?: boolean;
+  previous_response_id?: string;
+  conversation?: string;
+  stream?: boolean;
+}) {
+  return request<Record<string, unknown>>("/api/hermes_api/v1/responses", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model: "hermes-agent", ...body }),
+  });
+}
+
+export async function hermesGetResponse(id: string) {
+  return request<Record<string, unknown>>(`/api/hermes_api/v1/responses/${id}`);
+}
+
+export async function hermesDeleteResponse(id: string) {
+  return request<{ status: string }>(`/api/hermes_api/v1/responses/${id}`, { method: "DELETE" });
+}
+
+/* ── Runs API ────────────────────────────────────────────── */
+
+export async function hermesCreateRun(body: {
+  input: string;
+  session_id?: string;
+  instructions?: string;
+  previous_response_id?: string;
+}) {
+  return request<{ run_id: string; status: string }>("/api/hermes_api/v1/runs", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function hermesGetRun(runId: string) {
+  return request<HermesRunStatus>(`/api/hermes_api/v1/runs/${runId}`);
+}
+
+export async function hermesStopRun(runId: string) {
+  return request<{ status: string }>(`/api/hermes_api/v1/runs/${runId}/stop`, { method: "POST" });
+}
+
+/* ── Jobs API ────────────────────────────────────────────── */
+
+export async function hermesListJobs() {
+  return request<HermesJob[]>("/api/hermes_api/jobs");
+}
+
+export async function hermesCreateJob(body: { prompt: string; schedule?: string; [k: string]: unknown }) {
+  return request<HermesJob>("/api/hermes_api/jobs", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function hermesGetJob(jobId: string) {
+  return request<HermesJob>(`/api/hermes_api/jobs/${jobId}`);
+}
+
+export async function hermesUpdateJob(jobId: string, body: Record<string, unknown>) {
+  return request<HermesJob>(`/api/hermes_api/jobs/${jobId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function hermesDeleteJob(jobId: string) {
+  return request<{ status: string }>(`/api/hermes_api/jobs/${jobId}`, { method: "DELETE" });
+}
+
+export async function hermesPauseJob(jobId: string) {
+  return request<{ status: string }>(`/api/hermes_api/jobs/${jobId}/pause`, { method: "POST" });
+}
+
+export async function hermesResumeJob(jobId: string) {
+  return request<{ status: string }>(`/api/hermes_api/jobs/${jobId}/resume`, { method: "POST" });
+}
+
+export async function hermesRunJob(jobId: string) {
+  return request<{ status: string }>(`/api/hermes_api/jobs/${jobId}/run`, { method: "POST" });
+}
+
+/* ── Hermes Sessions API (live agent sessions) ───────────── */
+
+export async function hermesListSessions(params?: { limit?: number; offset?: number; source?: string }) {
+  const qs = new URLSearchParams();
+  if (params?.limit) qs.set("limit", String(params.limit));
+  if (params?.offset) qs.set("offset", String(params.offset));
+  if (params?.source) qs.set("source", params.source);
+  return request<HermesAgentSession[]>(`/api/hermes_api/sessions?${qs}`);
+}
+
+export async function hermesCreateSession(body?: { title?: string }) {
+  return request<HermesAgentSession>("/api/hermes_api/sessions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body ?? {}),
+  });
+}
+
+export async function hermesGetSession(id: string) {
+  return request<HermesAgentSession>(`/api/hermes_api/sessions/${id}`);
+}
+
+export async function hermesUpdateSession(id: string, body: { title?: string; end_reason?: string }) {
+  return request<HermesAgentSession>(`/api/hermes_api/sessions/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function hermesDeleteSession(id: string) {
+  return request<{ status: string }>(`/api/hermes_api/sessions/${id}`, { method: "DELETE" });
+}
+
+export async function hermesGetSessionMessages(id: string, limit = 500) {
+  return request<{ messages: SessionMessage[] }>(
+    `/api/hermes_api/sessions/${id}/messages?limit=${limit}`,
+  );
+}
+
+export async function hermesForkSession(id: string, body?: { title?: string }) {
+  return request<HermesAgentSession>(`/api/hermes_api/sessions/${id}/fork`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body ?? {}),
+  });
+}
+
+export async function hermesSessionChat(id: string, input: string) {
+  return request<{ output: string; usage?: unknown }>(`/api/hermes_api/sessions/${id}/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ input }),
+  });
+}

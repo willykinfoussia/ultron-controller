@@ -5,6 +5,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api.health import router as health_router
 from app.api.hermes import router as hermes_router
+from app.api.hermes_api import router as hermes_api_router
 from app.api.openviking import router as openviking_router
 from app.api.search import router as search_router
 from app.api.sessions import router as sessions_router
@@ -25,6 +26,7 @@ app.add_middleware(
 app.include_router(health_router)
 app.include_router(openviking_router)
 app.include_router(hermes_router)
+app.include_router(hermes_api_router)
 app.include_router(sessions_router)
 app.include_router(search_router)
 app.include_router(system_router)

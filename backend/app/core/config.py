@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     storage_exclude_system_paths: bool = True
     storage_max_path_length: int = 2048
 
+    hermes_api_base_url: str = "http://127.0.0.1:8642"
+    hermes_api_key: str = "hermes-ultron-api-server"
+    hermes_api_timeout_sec: float = 120.0
+
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=False,

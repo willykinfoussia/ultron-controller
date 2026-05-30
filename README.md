@@ -6,6 +6,7 @@ Ultron Controller est une interface unifiee pour piloter la memoire Hermes et Op
 - acces a `SOUL.md` (`~/.hermes/SOUL.md`)
 - lecture des sessions Hermes depuis SQLite (`~/.hermes/state.db`)
 - recherche OpenViking + recherche FTS sur les sessions
+- **onglet Hermes** : communication complete avec l'API Server Hermes (chat live, runs, sessions, jobs, discovery)
 
 ## Architecture
 
@@ -27,6 +28,12 @@ Ultron Controller est une interface unifiee pour piloter la memoire Hermes et Op
 - Node.js 20+
 - Hermes avec dossier `~/.hermes/` present
 - OpenViking accessible (par defaut `http://127.0.0.1:1933`)
+- Pour l'onglet **Hermes** : Hermes API Server actif (`hermes gateway`) avec les variables suivantes dans `~/.hermes/.env` :
+
+```
+API_SERVER_ENABLED=true
+API_SERVER_KEY=hermes-ultron-api-server
+```
 
 ## Variables d'environnement (optionnelles)
 
@@ -49,6 +56,11 @@ Toutes les variables backend utilisent le prefixe `ULTRON_`:
 - `ULTRON_STORAGE_FOLLOW_SYMLINKS` (defaut: `false`)
 - `ULTRON_STORAGE_EXCLUDE_SYSTEM_PATHS` (defaut: `true`)
 - `ULTRON_STORAGE_MAX_PATH_LENGTH` (defaut: `2048`)
+
+Variables pour l'onglet **Hermes** (API Server) :
+- `ULTRON_HERMES_API_BASE_URL` (defaut: `http://127.0.0.1:8642`) — URL de l'API Server Hermes
+- `ULTRON_HERMES_API_KEY` (defaut: `hermes-ultron-api-server`) — Bearer token (doit correspondre a `API_SERVER_KEY` dans `~/.hermes/.env`)
+- `ULTRON_HERMES_API_TIMEOUT_SEC` (defaut: `120`) — timeout en secondes pour les appels a l'API Hermes
 
 ## Developpement
 
@@ -143,6 +155,40 @@ SERVICE_NAME=ultron-controller ./deploy/deploy_frontend_and_restart.sh
 - `GET /api/storage/scan?path=/home&depth=4&limit=10`
 - `GET /api/storage/top-folders?path=/home&depth=4&limit=10`
 - `GET /api/storage/top-files?path=/home&depth=4&limit=10`
+
+### API Hermes (proxy vers l'API Server Hermes, prefixe `/api/hermes_api`)
+
+**Health & discovery**
+- `GET /api/hermes_api/health` et `GET /api/hermes_api/health/detailed`
+- `GET /api/hermes_api/v1/models`
+- `GET /api/hermes_api/v1/capabilities`
+- `GET /api/hermes_api/v1/skills`
+- `GET /api/hermes_api/v1/toolsets`
+
+**Chat & Responses**
+- `POST /api/hermes_api/v1/chat/completions` (stream ou JSON, compatible OpenAI)
+- `POST /api/hermes_api/v1/responses` (Responses API, `previous_response_id`, `conversation`)
+- `GET /api/hermes_api/v1/responses/{id}`
+- `DELETE /api/hermes_api/v1/responses/{id}`
+
+**Runs**
+- `POST /api/hermes_api/v1/runs`
+- `GET /api/hermes_api/v1/runs/{run_id}`
+- `GET /api/hermes_api/v1/runs/{run_id}/events` (SSE)
+- `POST /api/hermes_api/v1/runs/{run_id}/stop`
+
+**Jobs**
+- `GET/POST /api/hermes_api/jobs`
+- `GET/PATCH/DELETE /api/hermes_api/jobs/{job_id}`
+- `POST /api/hermes_api/jobs/{job_id}/pause|resume|run`
+
+**Sessions live Hermes**
+- `GET/POST /api/hermes_api/sessions`
+- `GET/PATCH/DELETE /api/hermes_api/sessions/{id}`
+- `GET /api/hermes_api/sessions/{id}/messages`
+- `POST /api/hermes_api/sessions/{id}/fork`
+- `POST /api/hermes_api/sessions/{id}/chat`
+- `POST /api/hermes_api/sessions/{id}/chat/stream` (SSE)
 
 ## System Resource Manager
 

@@ -706,6 +706,7 @@ textarea.editor {
   border-radius: var(--r-lg);
   background: var(--surface-2);
   overflow: hidden;
+  flex-shrink: 0;
   transition: border-color var(--t-fast) var(--ease-out);
 }
 

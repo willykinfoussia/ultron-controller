@@ -2,6 +2,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Toast, type ToastKind, type ToastState } from "./components/Toast";
+import { HermesPage } from "./pages/HermesPage";
 import { MemoryPage } from "./pages/MemoryPage";
 import { OpenVikingPage } from "./pages/OpenVikingPage";
 import { SearchPage } from "./pages/SearchPage";
@@ -9,7 +10,7 @@ import { SessionsPage } from "./pages/SessionsPage";
 import { SystemPage } from "./pages/SystemPage";
 
 /* ── Types ──────────────────────────────────────────────── */
-type TabId = "openviking" | "memory" | "sessions" | "search" | "system";
+type TabId = "openviking" | "memory" | "sessions" | "search" | "system" | "hermes";
 type Theme  = "dark" | "light";
 type AccentId = "indigo" | "blue" | "cyan" | "emerald" | "rose" | "amber";
 
@@ -51,6 +52,7 @@ const TABS: Array<{ id: TabId; label: string }> = [
   { id: "sessions",   label: "Sessions" },
   { id: "search",     label: "Search" },
   { id: "system",     label: "System" },
+  { id: "hermes",     label: "Hermes" },
 ];
 
 const TAB_IDS = TABS.map((t) => t.id);
@@ -116,6 +118,7 @@ export default function App() {
     if (activeTab === "memory")     return <MemoryPage {...props} />;
     if (activeTab === "sessions")   return <SessionsPage {...props} />;
     if (activeTab === "system")     return <SystemPage {...props} />;
+    if (activeTab === "hermes")     return <HermesPage {...props} />;
     return <SearchPage {...props} />;
   }, [activeTab, setToast]);
 
