@@ -570,6 +570,22 @@ export async function hermesApiHealthDetailed() {
   return request<Record<string, unknown>>("/api/hermes_api/health/detailed");
 }
 
+export interface HermesUpdateStatus {
+  up_to_date: boolean;
+  current_version?: string;
+  latest_version?: string;
+}
+
+export async function hermesUpdateStatus() {
+  return request<HermesUpdateStatus>("/api/hermes_api/update-status");
+}
+
+export async function hermesTriggerUpdate() {
+  return request<{ status?: string; up_to_date?: boolean }>("/api/hermes_api/update", {
+    method: "POST",
+  });
+}
+
 export async function hermesApiModels() {
   return request<{ data: Array<{ id: string }> }>("/api/hermes_api/v1/models");
 }

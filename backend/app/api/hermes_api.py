@@ -37,6 +37,19 @@ async def hermes_health_detailed(request: Request) -> Any:
     return await _client(request).get("/health/detailed")
 
 
+# ── Hermes update ──────────────────────────────────────────────────────────────
+
+
+@router.get("/update-status")
+async def hermes_update_status(request: Request) -> Any:
+    return await _client(request).get("/update-status")
+
+
+@router.post("/update")
+async def hermes_update(request: Request) -> Any:
+    return await _client(request).post("/update")
+
+
 # ── Discovery / capabilities ──────────────────────────────────────────────────
 
 

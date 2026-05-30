@@ -1,6 +1,7 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { hermesTriggerUpdate, hermesUpdateStatus } from "./api/client";
 import { Toast, type ToastKind, type ToastState } from "./components/Toast";
 import { HermesPage } from "./pages/HermesPage";
 import { MemoryPage } from "./pages/MemoryPage";
@@ -14,6 +15,7 @@ import { SystemPage } from "./pages/SystemPage";
 type TabId = "openviking" | "memory" | "sessions" | "search" | "system" | "hermes" | "settings";
 type Theme  = "dark" | "light";
 type AccentId = "indigo" | "blue" | "cyan" | "emerald" | "rose" | "amber";
+type HermesLedStatus = "up_to_date" | "outdated" | "unknown";
 
 /* ── Sections (sidebar groups) ──────────────────────────── */
 type SectionId = "knowledge" | "activity" | "system";
@@ -91,6 +93,43 @@ function useVersion() {
 /* ── App ─────────────────────────────────────────────────── */
 export default function App() {
   const appVersion = useVersion();
+  const [hermesStatus, setHermesStatus] = useState<HermesLedStatus>("unknown");
+  const [isHermesUpdating, setIsHermesUpdating] = useState(false);
+
+  const refreshHermesStatus = useCallback(async (): Promise<boolean> => {
+    try {
+      const status = await hermesUpdateStatus();
+      setHermesStatus(status.up_to_date ? "up_to_date" : "outdated");
+      return true;
+    } catch {
+      setHermesStatus("unknown");
+      return false;
+    }
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    const poll = async () => {
+      try {
+        const status = await hermesUpdateStatus();
+        if (!active) return;
+        setHermesStatus(status.up_to_date ? "up_to_date" : "outdated");
+      } catch {
+        if (!active) return;
+        setHermesStatus("unknown");
+      }
+    };
+
+    poll().catch(() => undefined);
+    const intervalId = window.setInterval(() => {
+      poll().catch(() => undefined);
+    }, 30_000);
+
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+    };
+  }, []);
 
   /* ── Preferences (persisted) ── */
   const [theme, setThemeState] = useState<Theme>(
@@ -131,6 +170,31 @@ export default function App() {
   const setToast = useCallback((message: string, kind: ToastKind = "info") => {
     setToastState({ message, kind });
   }, []);
+
+  const hermesIndicatorLabel = useMemo(() => {
+    if (isHermesUpdating) return "Hermes update in progress";
+    if (hermesStatus === "up_to_date") return "Hermes is up to date";
+    if (hermesStatus === "outdated") return "Hermes update available";
+    return "Hermes status unavailable";
+  }, [isHermesUpdating, hermesStatus]);
+
+  const handleHermesUpdateClick = useCallback(async () => {
+    if (isHermesUpdating) return;
+    setIsHermesUpdating(true);
+    try {
+      await hermesTriggerUpdate();
+      const statusRefreshed = await refreshHermesStatus();
+      if (!statusRefreshed) {
+        setToast("Hermes update triggered. Unable to refresh update status.", "info");
+      } else {
+        setToast("Hermes update triggered", "success");
+      }
+    } catch (err) {
+      setToast(String(err), "error");
+    } finally {
+      setIsHermesUpdating(false);
+    }
+  }, [isHermesUpdating, refreshHermesStatus, setToast]);
 
   useEffect(() => {
     if (!toast) return;
@@ -272,9 +336,25 @@ export default function App() {
               Hermes
             </button>
           </div>
-          <span className="topbar-title">
-            {NAV.find((n) => n.id === activeTab)?.label ?? ""}
-          </span>
+          <div className="topbar-right">
+            <button
+              className={`topbar-hermes-indicator topbar-hermes-indicator--${hermesStatus}${isHermesUpdating ? " is-updating" : ""}`}
+              onClick={() => {
+                handleHermesUpdateClick().catch(() => undefined);
+              }}
+              disabled={isHermesUpdating}
+              aria-label={hermesIndicatorLabel}
+              title={hermesIndicatorLabel}
+            >
+              <span
+                className={`topbar-hermes-indicator-dot${isHermesUpdating ? " is-spinning" : ""}`}
+                aria-hidden="true"
+              />
+            </button>
+            <span className="topbar-title">
+              {NAV.find((n) => n.id === activeTab)?.label ?? ""}
+            </span>
+          </div>
         </header>
 
         {/* ── Page (animated) ── */}

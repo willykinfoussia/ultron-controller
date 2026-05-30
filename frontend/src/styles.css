@@ -417,7 +417,70 @@ select:focus-visible {
   font-size: var(--text-lg);
   font-weight: 600;
   color: var(--text);
+}
+
+.topbar-right {
   margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.topbar-hermes-indicator {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-3);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: border-color var(--t-fast) var(--ease-out),
+              background var(--t-fast) var(--ease-out),
+              color var(--t-fast) var(--ease-out);
+}
+
+.topbar-hermes-indicator:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text-2);
+}
+
+.topbar-hermes-indicator:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--primary-ring);
+}
+
+.topbar-hermes-indicator:disabled {
+  cursor: progress;
+}
+
+.topbar-hermes-indicator--up_to_date {
+  color: var(--success);
+}
+
+.topbar-hermes-indicator--outdated {
+  color: var(--danger);
+}
+
+.topbar-hermes-indicator-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.topbar-hermes-indicator-dot.is-spinning {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--border);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  background: transparent;
+  animation: spin 0.65s linear infinite;
 }
 
 .topbar-nav {
