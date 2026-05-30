@@ -25,7 +25,6 @@ import {
   hermesCreateRun,
   hermesCreateSession,
   hermesDeleteJob,
-  hermesDeleteJob,
   hermesDeleteSession,
   hermesForkSession,
   hermesGetRun,
@@ -295,7 +294,7 @@ function ChatView({ setToast }: Props) {
             >
               <div className="message-header">
                 <span className={`role-chip ${msg.role}`}>{msg.role}</span>
-                {msg.streaming && <Spinner className="spinner-sm" />}
+                {msg.streaming && <Spinner size="sm" />}
               </div>
               <div className="message-body">
                 {msg.content && <pre>{msg.content}</pre>}
@@ -491,7 +490,7 @@ function RunsView({ setToast }: Props) {
               onClick={() => createRun().catch(() => undefined)}
               disabled={!input.trim() || launching}
             >
-              {launching ? <Spinner className="spinner-sm" /> : null}
+              {launching ? <Spinner size="sm" /> : null}
               {launching ? "Creating…" : "Create Run"}
             </button>
           </div>
@@ -724,7 +723,7 @@ function HermesSessionsView({ setToast }: Props) {
           <AnimatePresence mode="wait" initial={false}>
             {loading ? (
               <motion.div key="load" {...motionProps} transition={motionT}>
-                <div className="loading-center"><Spinner className="spinner-md" /></div>
+                <div className="loading-center"><Spinner size="md" /></div>
               </motion.div>
             ) : sessions.length === 0 ? (
               <motion.div key="empty" {...motionProps} transition={motionT}>
@@ -785,7 +784,7 @@ function HermesSessionsView({ setToast }: Props) {
               <span className="empty-state-title">Select a session</span>
             </div>
           ) : loadingMsgs ? (
-            <div className="loading-center"><Spinner className="spinner-md" /></div>
+            <div className="loading-center"><Spinner size="md" /></div>
           ) : msgs.length === 0 ? (
             <div className="empty-state">
               <span className="empty-state-icon">💬</span>
@@ -800,7 +799,7 @@ function HermesSessionsView({ setToast }: Props) {
                   </span>
                   {m.tool_name && <span className="badge warning">{m.tool_name}</span>}
                   {m.id === (streamingMsgId ? msgs[msgs.length - 1]?.id : null) && chatting && (
-                    <Spinner className="spinner-sm" />
+                    <Spinner size="sm" />
                   )}
                 </div>
                 <div className="message-body">
@@ -925,7 +924,7 @@ function JobsView({ setToast }: Props) {
               onClick={() => createJob().catch(() => undefined)}
               disabled={!newPrompt.trim() || creating}
             >
-              {creating ? <Spinner className="spinner-sm" /> : null}
+              {creating ? <Spinner size="sm" /> : null}
               {creating ? "Creating…" : "Create Job"}
             </button>
           </div>
@@ -942,7 +941,7 @@ function JobsView({ setToast }: Props) {
           </div>
           <div className="card-body no-padding" style={{ padding: 8 }}>
             {loading ? (
-              <div className="loading-center"><Spinner className="spinner-md" /></div>
+              <div className="loading-center"><Spinner size="md" /></div>
             ) : jobs.length === 0 ? (
               <div className="empty-state">
                 <span className="empty-state-icon">📅</span>
@@ -1116,7 +1115,7 @@ function InfoView({ setToast }: Props) {
   if (loading) {
     return (
       <div className="loading-center">
-        <Spinner className="spinner-lg" />
+        <Spinner size="lg" />
       </div>
     );
   }
