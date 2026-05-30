@@ -33,6 +33,10 @@ echo "==> Pulling latest changes..."
 cd "$ROOT_DIR"
 git pull --ff-only
 
+echo "==> Syncing backend dependencies..."
+cd "$ROOT_DIR/backend"
+uv sync
+
 echo "==> Building frontend..."
 cd "$FRONTEND_DIR"
 npm install
