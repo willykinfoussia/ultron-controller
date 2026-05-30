@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import asyncio
+import re
 from typing import Any
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from app.services.hermes_api_client import HermesApiClient, extract_client_headers
@@ -15,6 +17,9 @@ _SSE_HEADERS = {
     "X-Accel-Buffering": "no",
 }
 
+_HERMES_VERSION_RE = re.compile(r"Hermes Agent v([^\s]+)", re.IGNORECASE)
+_COMMITS_BEHIND_RE = re.compile(r"(\d+)\s+commits?\s+behind", re.IGNORECASE)
+
 
 def _client(request: Request) -> HermesApiClient:
     return request.app.state.hermes_api_client
@@ -22,6 +27,43 @@ def _client(request: Request) -> HermesApiClient:
 
 def _extra(request: Request) -> dict[str, str]:
     return extract_client_headers(request.headers)
+
+
+async def _run_hermes_command(*args: str, timeout_sec: float) -> tuple[int, str, str]:
+    proc = await asyncio.create_subprocess_exec(
+        "hermes",
+        *args,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    try:
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout_sec)
+    except TimeoutError as exc:
+        proc.kill()
+        await proc.communicate()
+        raise HTTPException(
+            status_code=504,
+            detail=f"`hermes {' '.join(args)}` timed out after {int(timeout_sec)}s",
+        ) from exc
+    return proc.returncode or 0, stdout.decode(errors="replace"), stderr.decode(errors="replace")
+
+
+def _parse_hermes_version(stdout: str, stderr: str) -> dict[str, Any]:
+    combined = "\n".join(part.strip() for part in (stdout, stderr) if part.strip())
+    lowered = combined.lower()
+    version_match = _HERMES_VERSION_RE.search(combined)
+    behind_match = _COMMITS_BEHIND_RE.search(combined)
+    update_available = "update available" in lowered
+    return {
+        "status": "ok",
+        "source": "hermes_cli",
+        "update_supported": True,
+        "up_to_date": not update_available,
+        "update_available": update_available,
+        "current_version": version_match.group(1) if version_match else None,
+        "commits_behind": int(behind_match.group(1)) if behind_match else None,
+        "raw_output": combined,
+    }
 
 
 # ── Health ────────────────────────────────────────────────────────────────────
@@ -42,12 +84,51 @@ async def hermes_health_detailed(request: Request) -> Any:
 
 @router.get("/update-status")
 async def hermes_update_status(request: Request) -> Any:
-    return await _client(request).get("/update-status")
+    try:
+        code, stdout, stderr = await _run_hermes_command("--version", timeout_sec=12)
+    except FileNotFoundError:
+        return {
+            "status": "unknown",
+            "source": "hermes_cli",
+            "update_supported": False,
+            "up_to_date": None,
+            "update_available": None,
+            "current_version": None,
+            "commits_behind": None,
+            "error": "`hermes` command not found on server",
+        }
+    if code != 0:
+        return {
+            "status": "unknown",
+            "source": "hermes_cli",
+            "update_supported": False,
+            "up_to_date": None,
+            "update_available": None,
+            "current_version": None,
+            "commits_behind": None,
+            "error": (stderr.strip() or stdout.strip() or "failed to run `hermes --version`"),
+        }
+    return _parse_hermes_version(stdout, stderr)
 
 
 @router.post("/update")
 async def hermes_update(request: Request) -> Any:
-    return await _client(request).post("/update")
+    try:
+        code, stdout, stderr = await _run_hermes_command("update", timeout_sec=900)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=503, detail="`hermes` command not found on server") from exc
+    output = "\n".join(part.strip() for part in (stdout, stderr) if part.strip())
+    if code != 0:
+        raise HTTPException(
+            status_code=502,
+            detail=(output or "`hermes update` failed"),
+        )
+    return {
+        "status": "ok",
+        "source": "hermes_cli",
+        "message": "Hermes update completed",
+        "output": output,
+    }
 
 
 # ── Discovery / capabilities ──────────────────────────────────────────────────
@@ -211,7 +292,13 @@ async def list_hermes_sessions(
 
 @router.post("/sessions")
 async def create_hermes_session(request: Request) -> Any:
-    body: dict = await request.json()
+    body: dict[str, Any] = {}
+    try:
+        payload = await request.json()
+        if isinstance(payload, dict):
+            body = payload
+    except Exception:
+        body = {}
     return await _client(request).post("/api/sessions", body=body, extra=_extra(request))
 
 

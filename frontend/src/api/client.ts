@@ -571,9 +571,15 @@ export async function hermesApiHealthDetailed() {
 }
 
 export interface HermesUpdateStatus {
-  up_to_date: boolean;
-  current_version?: string;
-  latest_version?: string;
+  status?: "ok" | "unknown";
+  up_to_date?: boolean | null;
+  update_available?: boolean | null;
+  current_version?: string | null;
+  commits_behind?: number | null;
+  update_supported?: boolean;
+  source?: string;
+  error?: string;
+  raw_output?: string;
 }
 
 export async function hermesUpdateStatus() {
@@ -581,7 +587,7 @@ export async function hermesUpdateStatus() {
 }
 
 export async function hermesTriggerUpdate() {
-  return request<{ status?: string; up_to_date?: boolean }>("/api/hermes_api/update", {
+  return request<{ status?: string; message?: string; output?: string; source?: string }>("/api/hermes_api/update", {
     method: "POST",
   });
 }
@@ -718,11 +724,14 @@ export async function hermesListSessions(params?: { limit?: number; offset?: num
 }
 
 export async function hermesCreateSession(body?: { title?: string }) {
-  return request<HermesAgentSession>("/api/hermes_api/sessions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body ?? {}),
-  });
+  if (body) {
+    return request<HermesAgentSession>("/api/hermes_api/sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  }
+  return request<HermesAgentSession>("/api/hermes_api/sessions", { method: "POST" });
 }
 
 export async function hermesGetSession(id: string) {

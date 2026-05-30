@@ -95,14 +95,22 @@ export default function App() {
   const appVersion = useVersion();
   const [hermesStatus, setHermesStatus] = useState<HermesLedStatus>("unknown");
   const [isHermesUpdating, setIsHermesUpdating] = useState(false);
+  const [hermesUpdateSupported, setHermesUpdateSupported] = useState(true);
+  const [hermesCurrentVersion, setHermesCurrentVersion] = useState<string | null>(null);
 
   const refreshHermesStatus = useCallback(async (): Promise<boolean> => {
     try {
       const status = await hermesUpdateStatus();
-      setHermesStatus(status.up_to_date ? "up_to_date" : "outdated");
+      if (status.up_to_date === true) setHermesStatus("up_to_date");
+      else if (status.up_to_date === false) setHermesStatus("outdated");
+      else setHermesStatus("unknown");
+      setHermesUpdateSupported(status.update_supported !== false);
+      setHermesCurrentVersion(status.current_version ?? null);
       return true;
     } catch {
       setHermesStatus("unknown");
+      setHermesUpdateSupported(false);
+      setHermesCurrentVersion(null);
       return false;
     }
   }, []);
@@ -110,16 +118,9 @@ export default function App() {
   useEffect(() => {
     let active = true;
     const poll = async () => {
-      try {
-        const status = await hermesUpdateStatus();
-        if (!active) return;
-        setHermesStatus(status.up_to_date ? "up_to_date" : "outdated");
-      } catch {
-        if (!active) return;
-        setHermesStatus("unknown");
-      }
+      if (!active) return;
+      await refreshHermesStatus();
     };
-
     poll().catch(() => undefined);
     const intervalId = window.setInterval(() => {
       poll().catch(() => undefined);
@@ -129,7 +130,7 @@ export default function App() {
       active = false;
       window.clearInterval(intervalId);
     };
-  }, []);
+  }, [refreshHermesStatus]);
 
   /* ── Preferences (persisted) ── */
   const [theme, setThemeState] = useState<Theme>(
@@ -172,29 +173,35 @@ export default function App() {
   }, []);
 
   const hermesIndicatorLabel = useMemo(() => {
+    const versionSuffix = hermesCurrentVersion ? ` (v${hermesCurrentVersion})` : "";
     if (isHermesUpdating) return "Hermes update in progress";
-    if (hermesStatus === "up_to_date") return "Hermes is up to date";
-    if (hermesStatus === "outdated") return "Hermes update available";
-    return "Hermes status unavailable";
-  }, [isHermesUpdating, hermesStatus]);
+    if (!hermesUpdateSupported) return `Hermes update not supported${versionSuffix}`;
+    if (hermesStatus === "up_to_date") return `Hermes is up to date${versionSuffix}`;
+    if (hermesStatus === "outdated") return `Hermes update available${versionSuffix}`;
+    return `Hermes status unavailable${versionSuffix}`;
+  }, [isHermesUpdating, hermesCurrentVersion, hermesStatus, hermesUpdateSupported]);
 
   const handleHermesUpdateClick = useCallback(async () => {
     if (isHermesUpdating) return;
+    if (!hermesUpdateSupported) {
+      setToast("Hermes update is not supported on this server.", "info");
+      return;
+    }
     setIsHermesUpdating(true);
     try {
-      await hermesTriggerUpdate();
+      const result = await hermesTriggerUpdate();
       const statusRefreshed = await refreshHermesStatus();
       if (!statusRefreshed) {
         setToast("Hermes update triggered. Unable to refresh update status.", "info");
       } else {
-        setToast("Hermes update triggered", "success");
+        setToast(result.message ?? "Hermes update triggered", "success");
       }
     } catch (err) {
       setToast(String(err), "error");
     } finally {
       setIsHermesUpdating(false);
     }
-  }, [isHermesUpdating, refreshHermesStatus, setToast]);
+  }, [hermesUpdateSupported, isHermesUpdating, refreshHermesStatus, setToast]);
 
   useEffect(() => {
     if (!toast) return;
@@ -342,7 +349,7 @@ export default function App() {
               onClick={() => {
                 handleHermesUpdateClick().catch(() => undefined);
               }}
-              disabled={isHermesUpdating}
+              disabled={isHermesUpdating || !hermesUpdateSupported}
               aria-label={hermesIndicatorLabel}
               title={hermesIndicatorLabel}
             >

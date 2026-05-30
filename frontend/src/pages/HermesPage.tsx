@@ -235,7 +235,7 @@ function ChatView({ setToast }: Props) {
 
     let sessionId = activeSessionId;
     if (!sessionId) {
-      const created = await hermesCreateSession({ title: "Dashboard chat" });
+      const created = await hermesCreateSession();
       sessionId = (created as HermesAgentSession).id;
       setActiveSessionId(sessionId);
       setConversationMode("session");
@@ -377,7 +377,7 @@ function ChatView({ setToast }: Props) {
 
   async function createAndAttachSession() {
     try {
-      const s = await hermesCreateSession({ title: "Dashboard chat" });
+      const s = await hermesCreateSession();
       const id = (s as HermesAgentSession).id;
       setActiveSessionId(id);
       setConversationMode("session");
@@ -898,7 +898,7 @@ function HermesSessionsView({ setToast }: Props) {
 
   async function newSession() {
     try {
-      const s = await hermesCreateSession({ title: "New session" });
+      const s = await hermesCreateSession();
       setSessions((prev) => [s as HermesAgentSession, ...prev]);
       setToast("Session created", "success");
     } catch (err) {
