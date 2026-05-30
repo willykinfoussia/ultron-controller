@@ -7,12 +7,39 @@ import { MemoryPage } from "./pages/MemoryPage";
 import { OpenVikingPage } from "./pages/OpenVikingPage";
 import { SearchPage } from "./pages/SearchPage";
 import { SessionsPage } from "./pages/SessionsPage";
+import { SettingsPage } from "./pages/SettingsPage";
 import { SystemPage } from "./pages/SystemPage";
 
 /* ── Types ──────────────────────────────────────────────── */
-type TabId = "openviking" | "memory" | "sessions" | "search" | "system" | "hermes";
+type TabId = "openviking" | "memory" | "sessions" | "search" | "system" | "hermes" | "settings";
 type Theme  = "dark" | "light";
 type AccentId = "indigo" | "blue" | "cyan" | "emerald" | "rose" | "amber";
+
+/* ── Sections (sidebar groups) ──────────────────────────── */
+type SectionId = "knowledge" | "activity" | "system";
+
+interface NavItem {
+  id: TabId;
+  label: string;
+  icon: string;
+  section: SectionId;
+}
+
+const SECTIONS: Array<{ id: SectionId; label: string }> = [
+  { id: "knowledge", label: "Knowledge" },
+  { id: "activity",  label: "Activity" },
+  { id: "system",    label: "System" },
+];
+
+const NAV: NavItem[] = [
+  { id: "openviking", label: "OpenViking", icon: "📚", section: "knowledge" },
+  { id: "memory",     label: "Hermes Memory", icon: "🧠", section: "knowledge" },
+  { id: "sessions",   label: "Sessions",   icon: "🗂️", section: "activity" },
+  { id: "search",     label: "Search",     icon: "🔍", section: "activity" },
+  { id: "hermes",     label: "Hermes",     icon: "🤖", section: "activity" },
+  { id: "system",     label: "System",     icon: "🖥️", section: "system" },
+  { id: "settings",   label: "Settings",   icon: "⚙️", section: "system" },
+];
 
 /* ── Accent presets ──────────────────────────────────────── */
 const ACCENTS: Record<AccentId, {
@@ -37,25 +64,13 @@ const ACCENT_IDS = Object.keys(ACCENTS) as AccentId[];
 function applyAccent(id: AccentId) {
   const a = ACCENTS[id];
   const root = document.documentElement;
-  root.style.setProperty("--primary",      a.primary);
+  root.style.setProperty("--primary",       a.primary);
   root.style.setProperty("--primary-hover", a.hover);
-  root.style.setProperty("--primary-fg",   a.fg);
-  root.style.setProperty("--primary-sub",  a.sub);
-  root.style.setProperty("--primary-ring", a.ring);
-  root.style.setProperty("--primary-glow", a.glow);
+  root.style.setProperty("--primary-fg",    a.fg);
+  root.style.setProperty("--primary-sub",   a.sub);
+  root.style.setProperty("--primary-ring",  a.ring);
+  root.style.setProperty("--primary-glow",  a.glow);
 }
-
-/* ── Tabs config ─────────────────────────────────────────── */
-const TABS: Array<{ id: TabId; label: string }> = [
-  { id: "openviking", label: "OpenViking" },
-  { id: "memory",     label: "Hermes Memory" },
-  { id: "sessions",   label: "Sessions" },
-  { id: "search",     label: "Search" },
-  { id: "system",     label: "System" },
-  { id: "hermes",     label: "Hermes" },
-];
-
-const TAB_IDS = TABS.map((t) => t.id);
 
 /* ── Version hook ─────────────────────────────────────────── */
 function useVersion() {
@@ -85,40 +100,34 @@ export default function App() {
     () => (localStorage.getItem("uc-accent") as AccentId | null) ?? "indigo"
   );
 
-  /* Apply theme on mount and on change */
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
     localStorage.setItem("uc-theme", theme);
   }, [theme]);
 
-  /* Apply accent on mount and on change */
   useEffect(() => {
     applyAccent(accent);
     localStorage.setItem("uc-accent", accent);
   }, [accent]);
 
-  function toggleTheme() {
-    setThemeState((t) => (t === "dark" ? "light" : "dark"));
-  }
-
   function setAccent(id: AccentId) {
     setAccentState(id);
   }
 
-  /* ── Tab navigation ── */
+  /* ── Navigation ── */
   const [activeTab, setActiveTab] = useState<TabId>("openviking");
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const dirRef = useRef<1 | -1>(1);
 
   function handleTabChange(id: TabId) {
-    const cur  = TAB_IDS.indexOf(activeTab);
-    const next = TAB_IDS.indexOf(id);
+    const cur  = NAV.findIndex((n) => n.id === activeTab);
+    const next = NAV.findIndex((n) => n.id === id);
     dirRef.current = next >= cur ? 1 : -1;
     setActiveTab(id);
   }
 
   /* ── Toast ── */
   const [toast, setToastState] = useState<ToastState>(null);
-
   const setToast = useCallback((message: string, kind: ToastKind = "info") => {
     setToastState({ message, kind });
   }, []);
@@ -137,8 +146,18 @@ export default function App() {
     if (activeTab === "sessions")   return <SessionsPage {...props} />;
     if (activeTab === "system")     return <SystemPage {...props} />;
     if (activeTab === "hermes")     return <HermesPage {...props} />;
+    if (activeTab === "settings")   return (
+      <SettingsPage
+        theme={theme}
+        accent={accent}
+        onThemeChange={setThemeState}
+        onAccentChange={setAccent}
+        setToast={setToast}
+        appVersion={appVersion}
+      />
+    );
     return <SearchPage {...props} />;
-  }, [activeTab, setToast]);
+  }, [activeTab, setToast, theme, accent, appVersion]);
 
   /* ── Reduced motion ── */
   const prefersReduced = useReducedMotion();
@@ -146,106 +165,110 @@ export default function App() {
   const pageVariants = prefersReduced
     ? undefined
     : {
-        initial: { opacity: 0, x: dirRef.current * 28 },
+        initial: { opacity: 0, x: dirRef.current * 20 },
         animate: { opacity: 1, x: 0 },
-        exit:    { opacity: 0, x: dirRef.current * -18 },
+        exit:    { opacity: 0, x: dirRef.current * -14 },
       };
 
   const pageTransition = prefersReduced
     ? { duration: 0 }
-    : { duration: 0.2, ease: [0, 0, 0.2, 1] };
+    : { duration: 0.18, ease: [0, 0, 0.2, 1] };
+
+  /* ── Sidebar sections ── */
+  const navBySection = SECTIONS.map((sec) => ({
+    ...sec,
+    items: NAV.filter((n) => n.section === sec.id),
+  }));
 
   /* ── Render ── */
   return (
-    <div className="layout">
-      {/* ── Header ── */}
-      <header className="app-header" role="banner">
-        <span className="app-name" aria-label="Ultron Controller">
-          <span>U</span>ltron
-        </span>
-        <div className="app-divider" aria-hidden="true" />
+    <div className={`layout ${sidebarOpen ? "sidebar-open" : "sidebar-closed"}`}>
 
-        <nav role="tablist" className="tabs" aria-label="Navigation principale">
-          {TABS.map((tab) => {
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                role="tab"
-                aria-selected={isActive}
-                aria-controls={`panel-${tab.id}`}
-                className={`tab-btn ${isActive ? "active" : ""}`}
-                onClick={() => handleTabChange(tab.id)}
-              >
-                {tab.label}
-                {isActive && (
-                  <motion.span
-                    className="tab-indicator"
-                    layoutId="tab-indicator"
-                    transition={{ type: "spring", stiffness: 420, damping: 32 }}
-                  />
-                )}
-              </button>
-            );
-          })}
-        </nav>
-
-        {/* ── Right controls: accent + theme ── */}
-        <div className="header-controls">
-          <div className="accent-picker" role="group" aria-label="Accent color">
-            {ACCENT_IDS.map((id) => (
-              <button
-                key={id}
-                className={`accent-dot ${accent === id ? "active" : ""}`}
-                style={{
-                  backgroundColor: ACCENTS[id].color,
-                  color: ACCENTS[id].color,
-                }}
-                onClick={() => setAccent(id)}
-                aria-label={`Accent ${id}`}
-                aria-pressed={accent === id}
-                title={id.charAt(0).toUpperCase() + id.slice(1)}
-              />
-            ))}
-          </div>
-
-          <motion.button
-            className="theme-toggle"
-            onClick={toggleTheme}
-            aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
-            title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
-            whileTap={prefersReduced ? {} : { scale: 0.88, rotate: 20 }}
-            transition={{ duration: 0.15 }}
+      {/* ── Sidebar ── */}
+      <aside className="sidebar" role="navigation" aria-label="Sidebar">
+        {/* Sidebar header */}
+        <div className="sidebar-header">
+          <span className="sidebar-logo" aria-label="Ultron Controller">
+            <span>U</span>ltron
+          </span>
+          <button
+            className="sidebar-toggle"
+            onClick={() => setSidebarOpen((o) => !o)}
+            aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+            title={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
           >
-            {theme === "dark" ? "☀︎" : "☽"}
-          </motion.button>
+            {sidebarOpen ? "◀" : "▶"}
+          </button>
         </div>
-      </header>
 
-      {/* ── Page (animated) ── */}
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.main
-          key={activeTab}
-          id={`panel-${activeTab}`}
-          role="tabpanel"
-          aria-label={TABS.find((t) => t.id === activeTab)?.label}
-          variants={pageVariants}
-          initial={prefersReduced ? false : "initial"}
-          animate={prefersReduced ? undefined : "animate"}
-          exit={prefersReduced ? undefined : "exit"}
-          transition={pageTransition}
-          style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}
-        >
-          {page}
-        </motion.main>
-      </AnimatePresence>
+        {/* Nav sections */}
+        <div className="sidebar-nav">
+          {navBySection.map((sec) => (
+            <div key={sec.id} className="sidebar-section">
+              {sidebarOpen && (
+                <p className="sidebar-section-label">{sec.label}</p>
+              )}
+              {sec.items.map((item) => {
+                const isActive = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    className={`sidebar-link ${isActive ? "active" : ""}`}
+                    onClick={() => handleTabChange(item.id)}
+                    aria-current={isActive ? "page" : undefined}
+                    title={!sidebarOpen ? item.label : undefined}
+                  >
+                    <span className="sidebar-link-icon" aria-hidden="true">{item.icon}</span>
+                    {sidebarOpen && (
+                      <span className="sidebar-link-label">{item.label}</span>
+                    )}
+                    {isActive && (
+                      <motion.span
+                        className="sidebar-link-indicator"
+                        layoutId="sidebar-indicator"
+                        transition={{ type: "spring", stiffness: 420, damping: 32 }}
+                      />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
 
-      {/* ── Footer ── */}
-      <footer className="app-footer" role="contentinfo">
-        <span className="footer-version">v{appVersion || "—"}</span>
-        <span className="footer-sep" aria-hidden="true">·</span>
-        <span className="footer-name">Ultron Controller</span>
-      </footer>
+        {/* Sidebar footer */}
+        {sidebarOpen && (
+          <div className="sidebar-footer">
+            <span className="sidebar-version">v{appVersion || "—"}</span>
+          </div>
+        )}
+      </aside>
+
+      {/* ── Main area ── */}
+      <div className="main-area">
+        {/* ── Top bar ── */}
+        <header className="topbar" role="banner">
+          <span className="topbar-title">
+            {NAV.find((n) => n.id === activeTab)?.label ?? ""}
+          </span>
+        </header>
+
+        {/* ── Page (animated) ── */}
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.main
+            key={activeTab}
+            role="main"
+            variants={pageVariants}
+            initial={prefersReduced ? false : "initial"}
+            animate={prefersReduced ? undefined : "animate"}
+            exit={prefersReduced ? undefined : "exit"}
+            transition={pageTransition}
+            className="main-content"
+          >
+            {page}
+          </motion.main>
+        </AnimatePresence>
+      </div>
 
       <Toast toast={toast} />
     </div>
