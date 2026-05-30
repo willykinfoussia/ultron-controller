@@ -123,7 +123,7 @@ export default function App() {
   const prefersReduced = useReducedMotion();
 
   const pageVariants = prefersReduced
-    ? {}
+    ? undefined
     : {
         initial: { opacity: 0, x: dirRef.current * 28 },
         animate: { opacity: 1, x: 0 },
@@ -209,9 +209,9 @@ export default function App() {
           role="tabpanel"
           aria-label={TABS.find((t) => t.id === activeTab)?.label}
           variants={pageVariants}
-          initial="initial"
-          animate="animate"
-          exit="exit"
+          initial={prefersReduced ? false : "initial"}
+          animate={prefersReduced ? undefined : "animate"}
+          exit={prefersReduced ? undefined : "exit"}
           transition={pageTransition}
           style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}
         >
