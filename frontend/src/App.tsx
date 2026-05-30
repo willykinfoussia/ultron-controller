@@ -189,15 +189,15 @@ export default function App() {
         {/* Sidebar header */}
         <div className="sidebar-header">
           <span className="sidebar-logo" aria-label="Ultron Controller">
-            <span>U</span>ltron
+            <span>U</span>{sidebarOpen && "ltron"}
           </span>
           <button
             className="sidebar-toggle"
             onClick={() => setSidebarOpen((o) => !o)}
-            aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
-            title={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+            aria-label="Collapse sidebar"
+            title="Collapse sidebar"
           >
-            {sidebarOpen ? "◀" : "▶"}
+            ◀
           </button>
         </div>
 
@@ -248,9 +248,33 @@ export default function App() {
       <div className="main-area">
         {/* ── Top bar ── */}
         <header className="topbar" role="banner">
+          {!sidebarOpen && (
+            <button
+              className="topbar-hamburger"
+              onClick={() => setSidebarOpen(true)}
+              aria-label="Open sidebar"
+              title="Open sidebar"
+            >
+              ☰
+            </button>
+          )}
           <span className="topbar-title">
             {NAV.find((n) => n.id === activeTab)?.label ?? ""}
           </span>
+          <div className="topbar-nav">
+            <button
+              className={`topbar-nav-link ${activeTab === "memory" ? "active" : ""}`}
+              onClick={() => handleTabChange("memory")}
+            >
+              Hermès Memory
+            </button>
+            <button
+              className={`topbar-nav-link ${activeTab === "hermes" ? "active" : ""}`}
+              onClick={() => handleTabChange("hermes")}
+            >
+              Hermès
+            </button>
+          </div>
         </header>
 
         {/* ── Page (animated) ── */}

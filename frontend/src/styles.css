@@ -210,6 +210,16 @@ select:focus-visible {
   width: 48px;
 }
 
+.layout.sidebar-closed .sidebar-toggle {
+  display: none;
+}
+
+.layout.sidebar-closed .sidebar-header {
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
+}
+
 .layout.sidebar-closed .sidebar-section-label,
 .layout.sidebar-closed .sidebar-footer {
   display: none;
@@ -376,13 +386,67 @@ select:focus-visible {
   border-bottom: 1px solid var(--border);
   background: var(--surface);
   flex-shrink: 0;
+  gap: var(--sp-3);
   transition: background var(--t-mid) var(--ease-out),
               border-color var(--t-mid) var(--ease-out);
+}
+
+.topbar-hamburger {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 14px;
+  flex-shrink: 0;
+  transition: background var(--t-fast) var(--ease-out),
+              color var(--t-fast) var(--ease-out);
+}
+
+.topbar-hamburger:hover {
+  background: var(--surface-2);
+  color: var(--text);
 }
 
 .topbar-title {
   font-size: var(--text-lg);
   font-weight: 600;
+  color: var(--text);
+}
+
+.topbar-nav {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+.topbar-nav-link {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-2);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: var(--r-md);
+  transition: background var(--t-fast) var(--ease-out),
+              color var(--t-fast) var(--ease-out);
+  white-space: nowrap;
+}
+
+.topbar-nav-link:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.topbar-nav-link.active {
+  background: var(--primary-sub);
   color: var(--text);
 }
 
@@ -414,10 +478,13 @@ select:focus-visible {
 @media (max-width: 768px) {
   .split-2 { grid-template-columns: 1fr; }
   .sidebar { width: 48px; }
+  .sidebar-toggle { display: none; }
+  .sidebar-header { justify-content: center; padding-left: 0; padding-right: 0; }
   .sidebar-section-label,
   .sidebar-footer { display: none; }
   .sidebar-link { justify-content: center; padding-left: 0; padding-right: 0; }
   .sidebar-link-label { display: none; }
+  .topbar-nav { display: none; }
 }
 
 /* ── Cards ───────────────────────────────────────────────── */
