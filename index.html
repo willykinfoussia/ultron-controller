@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ultron Controller</title>
+<style>
+:root{--bg:#0d1117;--s:#161b22;--sh:#1c2333;--b:#30363d;--t:#e6edf3;--tm:#8b949e;--td:#484f58;--a:#58a6ff;--ad:#1f6feb;--g:#3fb950;--r:#f85149;--y:#d29922;--o:#db6d28;--p:#bc8cff;--f:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;--m:'SF Mono','Fira Code',monospace;--R:8px;--Rs:4px}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--f);background:var(--bg);color:var(--t);height:100vh;overflow:hidden;display:flex;flex-direction:column}
+.tabs{display:flex;background:var(--s);border-bottom:1px solid var(--b);padding:0 16px;gap:2px;flex-shrink:0}
+.tab{padding:11px 15px;cursor:pointer;border-bottom:2px solid transparent;color:var(--tm);font-size:13px;transition:all .15s;user-select:none;white-space:nowrap}
+.tab:hover{color:var(--t);background:var(--sh)}
+.tab.active{color:var(--a);border-bottom-color:var(--a);font-weight:600}
+main{flex:1;display:flex;overflow:hidden}
+.panel{display:none;flex:1;overflow:hidden}
+.panel.active{display:flex}
+.sb{width:300px;min-width:180px;background:var(--s);border-right:1px solid var(--b);display:flex;flex-direction:column;overflow:hidden}
+.sh{padding:10px 14px;border-bottom:1px solid var(--b);font-size:11px;font-weight:700;text-transform:uppercase;color:var(--tm);letter-spacing:.6px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.sh-btns{display:flex;gap:4px}
+.tree{flex:1;overflow-y:auto;padding:6px}
+.ti{display:flex;align-items:center;gap:5px;padding:5px 7px;border-radius:var(--Rs);cursor:pointer;font-size:13px;color:var(--tm);transition:background .1s}
+.ti:hover{background:var(--sh);color:var(--t)}
+.ti.act{background:var(--ad);color:var(--t)}
+.ti .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ti .sz{font-size:10px;color:var(--td)}
+.tog{width:14px;height:14px;display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--td);cursor:pointer;transition:transform .15s;flex-shrink:0;border-radius:2px}
+.tog:hover{color:var(--tm)}
+.tog.op{transform:rotate(90deg)}
+.tch{padding-left:16px}
+.ea{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.et{padding:7px 14px;border-bottom:1px solid var(--b);display:flex;align-items:center;gap:8px;background:var(--s);flex-shrink:0}
+.et .uri{flex:1;font-family:var(--m);font-size:11px;color:var(--tm);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.et .acts{display:flex;gap:4px;flex-shrink:0}
+.btn{padding:5px 10px;border-radius:var(--Rs);border:1px solid var(--b);background:var(--s);color:var(--t);font-size:12px;cursor:pointer;transition:all .15s;font-family:var(--f);white-space:nowrap}
+.btn:hover{background:var(--sh);border-color:var(--tm)}
+.btn.p{background:var(--ad);border-color:var(--a);color:#fff}
+.btn.p:hover{background:var(--a)}
+.btn.d{color:var(--r)}
+.btn.d:hover{background:rgba(248,81,73,.12);border-color:var(--r)}
+.btn.sm{padding:3px 7px;font-size:11px}
+.ew{flex:1;overflow:hidden}
+.editor{width:100%;height:100%;background:var(--bg);color:var(--t);border:none;padding:14px;font-family:var(--m);font-size:13px;line-height:1.6;resize:none;outline:none;tab-size:2}
+.editor:focus{box-shadow:inset 0 0 0 1px var(--ad)}
+.ab{padding:8px 14px;background:var(--s);border-top:1px solid var(--b);font-size:11px;color:var(--tm);max-height:70px;overflow-y:auto;white-space:pre-wrap;font-family:var(--m);flex-shrink:0}
+.cb{flex:1;overflow-y:auto;padding:22px}
+.cb h1{font-size:18px;margin-bottom:10px}
+.cb h2{font-size:14px;color:var(--tm);margin:14px 0 6px}
+.cb p,.cb li{font-size:13px;line-height:1.7;color:var(--tm)}
+.cb ul{padding-left:18px;margin-bottom:10px}
+.cb code{font-family:var(--m);background:var(--s);padding:1px 5px;border-radius:3px;font-size:12px}
+.cb pre{background:var(--s);border:1px solid var(--b);border-radius:var(--R);padding:14px;overflow-x:auto;font-family:var(--m);font-size:12px;line-height:1.5;margin:10px 0;white-space:pre-wrap;word-break:break-word}
+.sb2{width:340px;min-width:200px;background:var(--s);border-right:1px solid var(--b);display:flex;flex-direction:column;overflow:hidden}
+.sl{flex:1;overflow-y:auto}
+.si{padding:10px 14px;border-bottom:1px solid rgba(48,54,61,.5);cursor:pointer;transition:background .1s}
+.si:hover{background:var(--sh)}
+.si.act{background:var(--ad)}
+.si .st{font-size:12px;font-weight:500;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.si .sm{font-size:10px;color:var(--td);font-family:var(--m)}
+.msgs{flex:1;overflow-y:auto;padding:14px}
+.msg{margin-bottom:10px;padding:9px 11px;border-radius:var(--R);font-size:12px;line-height:1.5;border-left:3px solid transparent}
+.msg.u{background:var(--s);border-left-color:var(--a)}
+.msg.a{background:var(--s);border-left-color:var(--g)}
+.msg.t{background:var(--s);border-left-color:var(--o);color:var(--tm);font-size:11px;font-family:var(--m)}
+.msg .rl{font-size:9px;font-weight:700;text-transform:uppercase;color:var(--tm);margin-bottom:3px;letter-spacing:.5px}
+.msg .tx{white-space:pre-wrap;word-break:break-word}
+.sbar{display:flex;gap:8px;margin-bottom:14px;flex-shrink:0}
+.sbar input{flex:1;padding:7px 11px;background:var(--s);border:1px solid var(--b);border-radius:var(--R);color:var(--t);font-size:13px;outline:none}
+.sbar input:focus{border-color:var(--a)}
+.ri{padding:10px;border:1px solid var(--b);border-radius:var(--R);margin-bottom:7px;cursor:pointer;transition:border-color .15s;background:var(--s)}
+.ri:hover{border-color:var(--a)}
+.ri .ru{font-family:var(--m);font-size:11px;color:var(--a);margin-bottom:3px;word-break:break-all}
+.ri .rs{font-size:12px;color:var(--tm)}
+.ri .rm{font-size:10px;color:var(--td);margin-top:3px}
+.stb{padding:4px 14px;background:var(--s);border-top:1px solid var(--b);font-size:10px;color:var(--td);display:flex;justify-content:space-between;flex-shrink:0}
+.sp{width:12px;height:12px;border:2px solid var(--b);border-top-color:var(--a);border-radius:50%;animation:sp .6s linear infinite;display:none}
+@keyframes sp{to{transform:rotate(360deg)}}
+.empty{padding:30px;text-align:center;color:var(--td);font-size:13px}
+.badge{font-size:9px;padding:1px 5px;border-radius:8px;background:var(--b);color:var(--tm)}
+</style>
+</head>
+<body>
+
+<div class="tabs">
+  <div class="tab active" data-tab="viking" onclick="sw('viking')">OpenViking</div>
+  <div class="tab" data-tab="hermes" onclick="sw('hermes')">Hermes Memory</div>
+  <div class="tab" data-tab="sessions" onclick="sw('sessions')">Sessions</div>
+  <div class="tab" data-tab="search" onclick="sw('search')">Search</div>
+</div>
+
+<main>
+  <!-- PANEL: OpenViking -->
+  <div class="panel active" id="p-viking">
+    <div class="sb">
+      <div class="sh"><span>viking://</span><div class="sh-btns"><button class="btn sm" onclick="ovMkdir()">+Dir</button><button class="btn sm" onclick="ovNewFile()">+File</button></div></div>
+      <div class="tree" id="vt"><div class="empty">Loading…</div></div>
+    </div>
+    <div class="ea">
+      <div class="et">
+        <span class="uri" id="vu">Select an item from the tree</span>
+        <div class="acts">
+          <button class="btn sm p" id="vs" onclick="ovSave()" style="display:none">Save</button>
+          <button class="btn sm d" id="vd" onclick="ovDel()" style="display:none">Delete</button>
+          <div class="sp" id="vsp"></div>
+        </div>
+      </div>
+      <div class="ew"><textarea class="editor" id="ve" placeholder="Select a file to view or edit…" spellcheck="false"></textarea></div>
+      <div class="ab" id="va"></div>
+    </div>
+  </div>
+
+  <!-- PANEL: Hermes Memory -->
+  <div class="panel" id="p-hermes">
+    <div class="sb">
+      <div class="sh"><span>Hermes Memory</span><div class="sh-btns"><button class="btn sm" onclick="hmNew()">+New</button></div></div>
+      <div class="tree" id="ht"><div class="empty">Loading…</div></div>
+    </div>
+    <div class="ea">
+      <div class="et">
+        <span class="uri" id="hf">Select a memory file</span>
+        <div class="acts">
+          <button class="btn sm p" id="hs" onclick="hmSave()" style="display:none">Save</button>
+          <button class="btn sm d" id="hd" onclick="hmDel()" style="display:none">Delete</button>
+          <div class="sp" id="hsp"></div>
+        </div>
+      </div>
+      <div class="ew"><textarea class="editor" id="he" placeholder="Select a file to view or edit…" spellcheck="false"></textarea></div>
+    </div>
+  </div>
+
+  <!-- PANEL: Sessions -->
+  <div class="panel" id="p-sessions">
+    <div class="sb2">
+      <div class="sh"><span>Session Transcripts</span></div>
+      <div class="sl" id="sl"><div class="empty">Loading…</div></div>
+    </div>
+    <div class="ea">
+      <div class="et"><span class="uri" id="st">Select a session</span></div>
+      <div class="msgs" id="sm"><div class="empty">Pick a session from the list</div></div>
+    </div>
+  </div>
+
+  <!-- PANEL: Search -->
+  <div class="panel" id="p-search">
+    <div style="width:100%;display:flex;flex-direction:column;overflow:hidden">
+      <div style="padding:18px 22px 0;flex-shrink:0">
+        <div class="sbar">
+          <input id="sq" placeholder="Search memories… (Enter)" onkeydown="if(event.key==='Enter')doSearch()">
+          <button class="btn p" onclick="doSearch()">Search</button>
+        </div>
+      </div>
+      <div class="cb" id="sr"><div class="empty">Enter a query to search OpenViking</div></div>
+    </div>
+  </div>
+</main>
+
+<div class="stb"><span id="sl">Ready</span><span>Ultron Controller v0.1</span></div>
+
+<script>
+const S=m=>{document.getElementById('sl').textContent=m};
+const SP=(id,on)=>{document.getElementById(id).style.display=on?'block':'none'};
+const G=(u,f)=>{fetch(u).then(r=>r.json()).then(f).catch(e=>S('Error: '+e))};
+const P=(u,b,f)=>{fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}).then(r=>r.json()).then(f).catch(e=>S('Error: '+e))};
+const D=(u,f)=>{fetch(u,{method:'DELETE'}).then(r=>r.json()).then(f).catch(e=>S('Error: '+e))};
+const esc=s=>{let d=document.createElement('div');d.textContent=s;return d.innerHTML};
+const enc=s=>encodeURIComponent(s).replace(/[!'()*]/g,c=>'%'+c.charCodeAt(0).toString(16));
+
+let V={uri:null,isDir:false,tree:{},exp:new Set(['viking://']),loaded:false};
+let H={file:null,loaded:false};
+let SS={list:[],cur:null,loaded:false};
+
+function sw(n){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===n));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id==='p-'+n));
+  if(n==='viking'&&!V.loaded){V.loaded=true;vLoadTree();}
+  if(n==='hermes'&&!H.loaded){H.loaded=true;hLoad();}
+  if(n==='sessions'&&!SS.loaded){SS.loaded=true;sLoad();}
+}
+
+// ═══ OpenViking ═══
+
+function vLoadTree(){
+  document.getElementById('vt').innerHTML='<div class="empty">Loading…</div>';
+  SP('vsp',true);
+  G('/api/ov/tree?uri=viking://&level_limit=2',d=>{
+    SP('vsp',false);
+    if(d.status==='ok'){V.tree=mkTree(d.result);vRender();S('Tree loaded');}
+    else S('Error loading tree');
+  });
+}
+
+function mkTree(items){
+  let root={c:{}};
+  items.forEach(it=>{
+    let p=it.uri.replace('viking://','').split('/');
+    let n=root;
+    p.forEach((s,i)=>{
+      if(!s)return;
+      if(!n.c[s])n.c[s]={n:s,uri:'viking://'+p.slice(0,i+1).join('/'),dir:i<p.length-1||it.isDir,ab:(it.abstract||'').substring(0,120),c:{}};
+      n=n.c[s];
+    });
+  });
+  return root;
+}
+
+function vRender(){document.getElementById('vt').innerHTML=rn(V.tree.c)}
+
+function rn(nodes){
+  return Object.values(nodes).sort((a,b)=>(b.dir-a.dir)||a.n.localeCompare(b.n)).map(n=>{
+    let exp=V.exp.has(n.uri);
+    let h=`<div class="ti" onclick="vSel('${n.uri}',${n.dir})" id="v_${enc(n.uri)}">`;
+    if(n.dir) h+=`<span class="tog ${exp?'op':''}" onclick="event.stopPropagation();vTog('${n.uri}')">▶</span>`;
+    else h+=`<span style="width:14px;flex-shrink:0"></span>`;
+    h+=`<span class="nm" title="${n.ab}">${n.n}</span></div>`;
+    if(n.dir&&exp&&Object.keys(n.c).length) h+=`<div class="tch">${rn(n.c)}</div>`;
+    return h;
+  }).join('');
+}
+
+function vTog(u){V.exp.has(u)?V.exp.delete(u):V.exp.add(u);vRender()}
+
+function vSel(uri,isDir){
+  V.uri=uri;V.isDir=isDir;
+  document.querySelectorAll('#vt .ti').forEach(e=>e.classList.remove('act'));
+  let el=document.getElementById('v_'+enc(uri));if(el)el.classList.add('act');
+  document.getElementById('vu').textContent=uri;
+  document.getElementById('vs').style.display='none';
+  document.getElementById('vd').style.display='';
+  if(isDir){
+    document.getElementById('ve').value='';
+    document.getElementById('ve').placeholder='Directory: '+uri;
+    G('/api/ov/abstract?uri='+encodeURIComponent(uri),d=>{document.getElementById('va').textContent=d.result||'';});
+  } else {
+    SP('vsp',true);
+    G('/api/ov/read?uri='+encodeURIComponent(uri),d=>{
+      document.getElementById('ve').value=d.result||'';
+      document.getElementById('vs').style.display='';
+      SP('vsp',false);
+    });
+    G('/api/ov/abstract?uri='+encodeURIComponent(uri),d=>{document.getElementById('va').textContent=d.result||'';});
+  }
+}
+
+function ovSave(){
+  if(!V.uri)return;
+  P('/api/ov/write',{uri:V.uri,content:document.getElementById('ve').value,mode:'replace'},d=>{
+    S(d.error?'Error: '+JSON.stringify(d):'Saved ✓');
+  });
+}
+
+function ovDel(){
+  if(!V.uri)return;
+  if(!confirm('Delete '+V.uri+'?'))return;
+  SP('vsp',true);
+  D('/api/ov/delete?uri='+encodeURIComponent(V.uri)+'&recursive=true',()=>{
+    S('Deleted ✓');V.uri=null;
+    document.getElementById('ve').value='';
+    document.getElementById('va').textContent='';
+    document.getElementById('vs').style.display='none';
+    document.getElementById('vd').style.display='none';
+    document.getElementById('vu').textContent='Select an item from the tree';
+    vLoadTree();
+    SP('vsp',false);
+  });
+}
+
+function ovMkdir(){
+  let par=V.uri||'viking://user/default/memories';
+  if(!par.endsWith('/'))par=par.substring(0,par.lastIndexOf('/')+1);
+  let nm=prompt('New directory name:');
+  if(!nm)return;
+  P('/api/ov/mkdir',{uri:par+nm},()=>{vLoadTree();S('Created directory ✓');});
+}
+
+function ovNewFile(){
+  let par=V.uri||'viking://user/default/memories/patterns';
+  if(!par.endsWith('/'))par=par.substring(0,par.lastIndexOf('/')+1);
+  let nm=prompt('New file name:');
+  if(!nm)return;
+  P('/api/ov/write',{uri:par+nm,content:'',mode:'replace'},()=>{vLoadTree();S('Created file ✓');});
+}
+
+// ═══ Hermes Memory ═══
+
+function hLoad(){
+  G('/api/hermes/files',d=>{H.files=d.files||[];hRender();});
+}
+
+function hRender(){
+  let c=document.getElementById('ht');
+  if(!H.files.length){c.innerHTML='<div class="empty">No memory files found</div>';return}
+  c.innerHTML=H.files.map(f=>`<div class="ti" onclick="hSel('${f.name}')" id="h_${f.name}">
+    <span style="width:14px;flex-shrink:0"></span>
+    <span class="nm">${f.name}</span>
+    <span class="sz">${f.size}B</span>
+  </div>`).join('');
+}
+
+function hSel(name){
+  H.file=name;
+  document.querySelectorAll('#ht .ti').forEach(e=>e.classList.remove('act'));
+  let el=document.getElementById('h_'+name);if(el)el.classList.add('act');
+  document.getElementById('hf').textContent=name;
+  document.getElementById('hs').style.display='';
+  document.getElementById('hd').style.display='';
+  SP('hsp',true);
+  G('/api/hermes/file/'+encodeURIComponent(name),d=>{
+    document.getElementById('he').value=d.content||'';
+    SP('hsp',false);
+  });
+}
+
+function hmSave(){
+  if(!H.file)return;
+  P('/api/hermes/file/'+encodeURIComponent(H.file),{uri:'',content:document.getElementById('he').value,mode:'replace'},()=>{S('Saved ✓');});
+}
+
+function hmDel(){
+  if(!H.file)return;
+  if(!confirm('Delete '+H.file+'?'))return;
+  D('/api/hermes/file/'+encodeURIComponent(H.file),()=>{
+    S('Deleted ✓');H.file=null;
+    document.getElementById('he').value='';
+    document.getElementById('hs').style.display='none';
+    document.getElementById('hd').style.display='none';
+    document.getElementById('hf').textContent='Select a memory file';
+    hLoad();
+  });
+}
+
+function hmNew(){
+  let nm=prompt('New memory file name (e.g. notes.md):');
+  if(!nm)return;
+  P('/api/hermes/file/'+encodeURIComponent(nm),{uri:'',content:'# '+nm+'\n\n',mode:'replace'},()=>{hLoad();S('Created ✓');});
+}
+
+// ═══ Sessions ═══
+
+function sLoad(){
+  G('/api/ov/sessions',d=>{
+    SS.list=d.result||d.sessions||[];
+    sRender();
+  });
+}
+
+function sRender(){
+  let c=document.getElementById('sl');
+  if(!SS.list.length){c.innerHTML='<div class="empty">No sessions found</div>';return}
+  c.innerHTML=SS.list.map(s=>{
+    let id=s.session_id||s.id||'';
+    let title=s.title||s.name||id.substring(0,50);
+    let meta=s.updated_at||s.created_at||'';
+    return `<div class="si" onclick="sSel('${id}',this)">
+      <div class="st">${esc(title)}</div>
+      <div class="sm">${id.substring(0,24)} ${meta}</div>
+    </div>`;
+  }).join('');
+}
+
+function sSel(id,el){
+  SS.cur=id;
+  document.querySelectorAll('#sl .si').forEach(e=>e.classList.remove('act'));
+  if(el)el.classList.add('act');
+  document.getElementById('st').textContent=id;
+  document.getElementById('sm').innerHTML='<div class="empty">Loading messages…</div>';
+  G('/api/ov/sessions/'+encodeURIComponent(id),d=>{
+    let msgs=d.messages||d.result||[];
+    if(!Array.isArray(msgs))msgs=[];
+    let c=document.getElementById('sm');
+    if(!msgs.length){c.innerHTML='<div class="empty">No messages in this session</div>';return}
+    c.innerHTML=msgs.map(m=>{
+      let role=m.role||'unknown';
+      let cls=role==='user'?'u':role==='assistant'?'a':'t';
+      let content=m.content||m.text||JSON.stringify(m).substring(0,300);
+      if(typeof content!=='string')content=JSON.stringify(content,null,2);
+      return `<div class="msg ${cls}"><div class="rl">${role}</div><div class="tx">${esc(content)}</div></div>`;
+    }).join('');
+  });
+}
+
+// ═══ Search ═══
+
+function doSearch(){
+  let q=document.getElementById('sq').value.trim();
+  if(!q)return;
+  S('Searching…');
+  P('/api/ov/search',{query:q,target_uri:'',limit:20},d=>{
+    let items=d.items||d.result||[];
+    if(!Array.isArray(items))items=[];
+    let c=document.getElementById('sr');
+    if(!items.length){c.innerHTML='<div class="empty">No results found</div>';S('No results');return}
+    c.innerHTML=items.map(r=>{
+      let uri=r.uri||r.id||'';
+      let snippet=(r.abstract||r.content||r.text||r.overview||'').substring(0,200);
+      let score=r.score||r._score||'';
+      return `<div class="ri" onclick="goUri('${uri}')">
+        <div class="ru">${esc(uri)}</div>
+        <div class="rs">${esc(snippet)}</div>
+        <div class="rm">score: ${typeof score==='number'?score.toFixed(3):score}</div>
+      </div>`;
+    }).join('');
+    S('Found '+items.length+' results');
+  });
+}
+
+function goUri(uri){sw('viking');vSel(uri,false)}
+
+// Init
+V.loaded=true;vLoadTree();
+</script>
+</body>
+</html>
