@@ -1,0 +1,80 @@
+from __future__ import annotations
+
+import asyncio
+
+from fastapi import HTTPException
+from pydantic import ValidationError
+
+from app.core.config import Settings
+from app.core.schemas import StorageScanQuery
+from app.storage_analyzer.analyzer import StorageAnalyzer
+from app.utils.safe_path import is_excluded_system_path, validate_scan_path
+
+
+class StorageService:
+    def __init__(self, settings: Settings) -> None:
+        self._settings = settings
+        self._analyzer = StorageAnalyzer(cache_ttl_sec=settings.storage_cache_ttl_sec)
+
+    def _validate_params(self, path: str, depth: int, limit: int) -> tuple[str, int, int]:
+        try:
+            params = StorageScanQuery(path=path, depth=depth, limit=limit)
+        except ValidationError as exc:
+            raise HTTPException(status_code=400, detail=f"Invalid scan parameters: {exc}") from exc
+
+        max_depth = min(self._settings.storage_max_depth, 16)
+        max_limit = min(self._settings.storage_max_limit, 100)
+        bounded_depth = min(params.depth, max_depth)
+        bounded_limit = min(params.limit, max_limit)
+        return params.path, bounded_depth, bounded_limit
+
+    async def scan(self, path: str, depth: int, limit: int) -> dict:
+        path_raw, bounded_depth, bounded_limit = self._validate_params(path=path, depth=depth, limit=limit)
+        root = validate_scan_path(path_raw, max_length=self._settings.storage_max_path_length)
+        if self._settings.storage_exclude_system_paths and is_excluded_system_path(root):
+            raise HTTPException(status_code=403, detail="Scanning this system path is not allowed")
+
+        result = await asyncio.to_thread(
+            self._analyzer.scan,
+            root,
+            bounded_depth,
+            bounded_limit,
+            self._settings.storage_max_entries,
+            self._settings.storage_scan_timeout_sec,
+            self._settings.storage_follow_symlinks,
+            self._settings.storage_exclude_system_paths,
+        )
+        result["status"] = "partial" if result.get("partial") else "ok"
+        return result
+
+    async def top_folders(self, path: str, depth: int, limit: int) -> dict:
+        result = await self.scan(path=path, depth=depth, limit=limit)
+        return {
+            "status": result["status"],
+            "path": result["path"],
+            "items": result["top_folders"],
+            "meta": {
+                "from_cache": result.get("from_cache", False),
+                "partial": result.get("partial", False),
+                "stop_reason": result.get("stop_reason", ""),
+                "entries_visited": result.get("entries_visited", 0),
+                "elapsed_ms": result.get("elapsed_ms", 0),
+                "generated_at": result.get("generated_at"),
+            },
+        }
+
+    async def top_files(self, path: str, depth: int, limit: int) -> dict:
+        result = await self.scan(path=path, depth=depth, limit=limit)
+        return {
+            "status": result["status"],
+            "path": result["path"],
+            "items": result["top_files"],
+            "meta": {
+                "from_cache": result.get("from_cache", False),
+                "partial": result.get("partial", False),
+                "stop_reason": result.get("stop_reason", ""),
+                "entries_visited": result.get("entries_visited", 0),
+                "elapsed_ms": result.get("elapsed_ms", 0),
+                "generated_at": result.get("generated_at"),
+            },
+        }

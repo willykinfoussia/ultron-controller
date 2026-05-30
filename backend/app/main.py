@@ -8,6 +8,8 @@ from app.api.hermes import router as hermes_router
 from app.api.openviking import router as openviking_router
 from app.api.search import router as search_router
 from app.api.sessions import router as sessions_router
+from app.api.storage_routes import router as storage_router
+from app.api.system_routes import router as system_router
 from app.core.config import get_settings
 
 settings = get_settings()
@@ -25,6 +27,8 @@ app.include_router(openviking_router)
 app.include_router(hermes_router)
 app.include_router(sessions_router)
 app.include_router(search_router)
+app.include_router(system_router)
+app.include_router(storage_router)
 
 frontend_dist = settings.frontend_dist
 if frontend_dist.exists():

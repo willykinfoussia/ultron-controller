@@ -41,6 +41,69 @@ export type SearchResult = {
   score?: number;
 };
 
+export type SystemCpuMetric = {
+  usage_percent: number;
+};
+
+export type SystemMemoryMetric = {
+  total: number;
+  used: number;
+  free: number;
+  percent: number;
+};
+
+export type SystemDiskMetric = {
+  path: string;
+  total: number;
+  used: number;
+  free: number;
+  percent: number;
+};
+
+export type SystemProcess = {
+  pid: number;
+  name: string;
+  username: string;
+  status: string;
+  cpu_percent: number;
+  memory_percent: number;
+};
+
+export type StorageEntry = {
+  path: string;
+  size: number;
+};
+
+export type StorageScanMeta = {
+  from_cache: boolean;
+  partial: boolean;
+  stop_reason: string;
+  entries_visited: number;
+  elapsed_ms: number;
+  generated_at?: number;
+};
+
+export type StorageScanResponse = {
+  status: "ok" | "partial";
+  path: string;
+  top_folders: StorageEntry[];
+  top_files: StorageEntry[];
+  entries_visited: number;
+  permission_denied: number;
+  partial: boolean;
+  stop_reason: string;
+  elapsed_ms: number;
+  generated_at: number;
+  from_cache: boolean;
+};
+
+export type StorageTopResponse = {
+  status: "ok" | "partial";
+  path: string;
+  items: StorageEntry[];
+  meta: StorageScanMeta;
+};
+
 async function request<T>(input: string, init?: RequestInit): Promise<T> {
   const response = await fetch(input, init);
   const data = (await response.json()) as T & { detail?: string };
@@ -180,6 +243,42 @@ export async function sessionSearch(query: string, limit = 20) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ query, limit })
   });
+}
+
+export async function systemCpu() {
+  return request<SystemCpuMetric>("/api/system/cpu");
+}
+
+export async function systemMemory() {
+  return request<SystemMemoryMetric>("/api/system/memory");
+}
+
+export async function systemDisk() {
+  return request<SystemDiskMetric>("/api/system/disk");
+}
+
+export async function systemProcesses(limit = 20, sort: "cpu" | "memory" = "cpu") {
+  return request<{ sort_by: string; count: number; items: SystemProcess[] }>(
+    `/api/system/processes?limit=${limit}&sort=${sort}`
+  );
+}
+
+export async function storageScan(path: string, depth = 4, limit = 10) {
+  return request<StorageScanResponse>(
+    `/api/storage/scan?path=${encodeURIComponent(path)}&depth=${depth}&limit=${limit}`
+  );
+}
+
+export async function storageTopFolders(path: string, depth = 4, limit = 10) {
+  return request<StorageTopResponse>(
+    `/api/storage/top-folders?path=${encodeURIComponent(path)}&depth=${depth}&limit=${limit}`
+  );
+}
+
+export async function storageTopFiles(path: string, depth = 4, limit = 10) {
+  return request<StorageTopResponse>(
+    `/api/storage/top-files?path=${encodeURIComponent(path)}&depth=${depth}&limit=${limit}`
+  );
 }
 
 export type OvNode = {

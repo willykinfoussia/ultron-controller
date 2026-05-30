@@ -9,6 +9,7 @@ type ContentEditorProps = {
   onDelete?: () => void;
   disableDelete?: boolean;
   extraActions?: ReactNode;
+  saving?: boolean;
 };
 
 export function ContentEditor({
@@ -19,37 +20,57 @@ export function ContentEditor({
   onSave,
   onDelete,
   disableDelete,
-  extraActions
+  extraActions,
+  saving = false,
 }: ContentEditorProps) {
   return (
     <div className="card">
       <div className="card-header">
-        <div>
-          <div>{title}</div>
-          {subtitle ? <div className="muted">{subtitle}</div> : null}
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div className="card-title">{title}</div>
+          {subtitle ? (
+            <div className="card-subtitle" title={subtitle}>
+              {subtitle}
+            </div>
+          ) : null}
         </div>
         <div className="toolbar">
           {extraActions}
           {onDelete ? (
-            <button className="danger" onClick={onDelete} disabled={disableDelete}>
+            <button
+              className="danger"
+              onClick={onDelete}
+              disabled={disableDelete}
+              aria-label="Delete"
+              title="Delete"
+            >
               Delete
             </button>
           ) : null}
-          <button className="primary" onClick={onSave}>
-            Save
+          <button
+            className="primary"
+            onClick={onSave}
+            disabled={saving}
+            aria-label="Save (Ctrl+S)"
+            title="Save (Ctrl+S)"
+          >
+            {saving ? "Saving…" : "Save"}
           </button>
         </div>
       </div>
-      <div className="card-content">
+      <div className="card-body no-padding">
         <textarea
+          className="editor"
+          style={{ border: "none", borderRadius: 0, outline: "none" }}
           value={value}
-          onChange={(event) => onChange(event.target.value)}
-          onKeyDown={(event) => {
-            if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
-              event.preventDefault();
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={(e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+              e.preventDefault();
               onSave();
             }
           }}
+          spellCheck={false}
         />
       </div>
     </div>

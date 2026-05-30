@@ -27,3 +27,14 @@ class SearchQuery(BaseModel):
 class SessionSearchQuery(BaseModel):
     query: str
     limit: int = Field(default=20, ge=1, le=200)
+
+
+class SystemProcessesQuery(BaseModel):
+    limit: int = Field(default=20, ge=1, le=100)
+    sort: str = Field(default="cpu", pattern="^(cpu|memory)$")
+
+
+class StorageScanQuery(BaseModel):
+    path: str = Field(min_length=1, max_length=2048)
+    depth: int = Field(default=4, ge=1, le=16)
+    limit: int = Field(default=10, ge=1, le=100)

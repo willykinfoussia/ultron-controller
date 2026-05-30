@@ -36,6 +36,19 @@ Toutes les variables backend utilisent le prefixe `ULTRON_`:
 - `ULTRON_HERMES_HOME`
 - `ULTRON_MEMORIES_DIR_NAME` (defaut: `memories`)
 - `ULTRON_STATE_DB_NAME` (defaut: `state.db`)
+- `ULTRON_SYSTEM_DISK_PATH` (defaut: `/`)
+- `ULTRON_SYSTEM_CACHE_TTL_SEC` (defaut: `1.5`)
+- `ULTRON_SYSTEM_DEFAULT_PROCESS_LIMIT` (defaut: `20`)
+- `ULTRON_SYSTEM_MAX_PROCESS_LIMIT` (defaut: `100`)
+- `ULTRON_STORAGE_SCAN_TIMEOUT_SEC` (defaut: `8.0`)
+- `ULTRON_STORAGE_MAX_DEPTH` (defaut: `4`)
+- `ULTRON_STORAGE_MAX_ENTRIES` (defaut: `200000`)
+- `ULTRON_STORAGE_DEFAULT_LIMIT` (defaut: `10`)
+- `ULTRON_STORAGE_MAX_LIMIT` (defaut: `50`)
+- `ULTRON_STORAGE_CACHE_TTL_SEC` (defaut: `45.0`)
+- `ULTRON_STORAGE_FOLLOW_SYMLINKS` (defaut: `false`)
+- `ULTRON_STORAGE_EXCLUDE_SYSTEM_PATHS` (defaut: `true`)
+- `ULTRON_STORAGE_MAX_PATH_LENGTH` (defaut: `2048`)
 
 ## Developpement
 
@@ -123,3 +136,23 @@ SERVICE_NAME=ultron-controller ./deploy/deploy_frontend_and_restart.sh
 - `GET /api/sessions` et `GET /api/sessions/{session_id}`
 - `POST /api/search/openviking`
 - `POST /api/search/sessions`
+- `GET /api/system/cpu`
+- `GET /api/system/memory`
+- `GET /api/system/disk`
+- `GET /api/system/processes?limit=20&sort=cpu|memory`
+- `GET /api/storage/scan?path=/home&depth=4&limit=10`
+- `GET /api/storage/top-folders?path=/home&depth=4&limit=10`
+- `GET /api/storage/top-files?path=/home&depth=4&limit=10`
+
+## System Resource Manager
+
+Le module `System` dans l'UI ajoute:
+- monitoring CPU/RAM/Disque avec refresh auto (5s par defaut)
+- top processes (CPU/RAM) triables
+- analyse stockage (top dossiers/fichiers) avec scan securise
+
+Le scanner stockage est protege contre les scans trop couteux:
+- limites de profondeur / nombre d'entrees
+- timeout hard-stop
+- exclusions des chemins systeme critiques (par defaut)
+- cache TTL pour eviter les recalculs constants

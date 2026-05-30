@@ -1,3 +1,4 @@
+import { motion } from "framer-motion";
 import type { OvNode } from "../api/client";
 
 type FileTreeProps = {
@@ -11,22 +12,52 @@ function displayName(uri: string) {
   return parts[parts.length - 1] || uri;
 }
 
+function parentPath(uri: string) {
+  const trimmed = uri.endsWith("/") ? uri.slice(0, -1) : uri;
+  const idx = trimmed.lastIndexOf("/");
+  return idx < 0 ? "" : trimmed.slice(0, idx + 1);
+}
+
 export function FileTree({ nodes, selectedUri, onSelect }: FileTreeProps) {
+  if (!nodes.length) {
+    return (
+      <div className="empty-state">
+        <span className="empty-state-icon">📂</span>
+        <span className="empty-state-desc">No files found</span>
+      </div>
+    );
+  }
+
   return (
-    <div className="list">
-      {nodes.map((node) => {
+    <div className="list" role="navigation" aria-label="File tree">
+      {nodes.map((node, i) => {
         const uri = String(node.uri);
         const isDir = Boolean(node.isDir ?? node.is_dir);
+        const name = displayName(uri);
+        const parent = parentPath(uri);
+        const isActive = selectedUri === uri;
+
         return (
-          <div
+          <motion.button
             key={uri}
-            className={`list-item ${selectedUri === uri ? "active" : ""}`}
+            aria-current={isActive ? "true" : undefined}
+            aria-label={`${isDir ? "Directory" : "File"}: ${name}`}
+            className={`list-item ${isActive ? "active" : ""}`}
             onClick={() => onSelect(uri)}
+            initial={{ opacity: 0, x: -4 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: i * 0.025, duration: 0.18, ease: "easeOut" }}
           >
-            <div>{displayName(uri)}</div>
-            <div className="muted">{isDir ? "Directory" : "File"}</div>
-            <div className="muted">{uri}</div>
-          </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span className="file-icon" aria-hidden="true">
+                {isDir ? "📁" : "📄"}
+              </span>
+              <span className="list-item-name">{name}</span>
+            </div>
+            {parent ? (
+              <span className="list-item-meta truncate">{parent}</span>
+            ) : null}
+          </motion.button>
         );
       })}
     </div>
