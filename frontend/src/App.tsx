@@ -34,8 +34,8 @@ const SECTIONS: Array<{ id: SectionId; label: string }> = [
 const NAV: NavItem[] = [
   { id: "openviking", label: "OpenViking", icon: "📚", section: "knowledge" },
   { id: "memory",     label: "Hermes Memory", icon: "🧠", section: "knowledge" },
-  { id: "sessions",   label: "Sessions",   icon: "🗂️", section: "activity" },
-  { id: "search",     label: "Search",     icon: "🔍", section: "activity" },
+  { id: "sessions",   label: "Sessions",   icon: "🗂️", section: "knowledge" },
+  { id: "search",     label: "Search",     icon: "🔍", section: "knowledge" },
   { id: "hermes",     label: "Hermes",     icon: "🤖", section: "activity" },
   { id: "system",     label: "System",     icon: "🖥️", section: "system" },
   { id: "settings",   label: "Settings",   icon: "⚙️", section: "system" },
@@ -258,23 +258,23 @@ export default function App() {
               ☰
             </button>
           )}
-          <span className="topbar-title">
-            {NAV.find((n) => n.id === activeTab)?.label ?? ""}
-          </span>
           <div className="topbar-nav">
             <button
               className={`topbar-nav-link ${activeTab === "memory" ? "active" : ""}`}
               onClick={() => handleTabChange("memory")}
             >
-              Hermès Memory
+              hermes memory
             </button>
             <button
               className={`topbar-nav-link ${activeTab === "hermes" ? "active" : ""}`}
               onClick={() => handleTabChange("hermes")}
             >
-              Hermès
+              hermes
             </button>
           </div>
+          <span className="topbar-title">
+            {NAV.find((n) => n.id === activeTab)?.label ?? ""}
+          </span>
         </header>
 
         {/* ── Page (animated) ── */}
