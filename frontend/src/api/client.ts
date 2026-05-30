@@ -106,11 +106,34 @@ export type StorageTopResponse = {
 
 async function request<T>(input: string, init?: RequestInit): Promise<T> {
   const response = await fetch(input, init);
-  const data = (await response.json()) as T & { detail?: string };
-  if (!response.ok) {
-    throw new Error(data.detail || `Request failed (${response.status})`);
+  const raw = await response.text();
+  const contentType = response.headers.get("content-type") ?? "";
+  let data: unknown = null;
+  if (raw) {
+    const looksJson = contentType.includes("application/json") || /^[\s]*[\[{]/.test(raw);
+    if (looksJson) {
+      try {
+        data = JSON.parse(raw);
+      } catch {
+        data = raw;
+      }
+    } else {
+      data = raw;
+    }
   }
-  return data;
+  if (!response.ok) {
+    const payload = (data && typeof data === "object") ? (data as { detail?: string; message?: string }) : null;
+    const detail = payload?.detail ?? payload?.message;
+    if (detail) throw new Error(detail);
+    if (typeof data === "string" && data.trim()) {
+      // Avoid surfacing full HTML error pages from reverse proxies.
+      const msg = data.trim().startsWith("<!DOCTYPE") ? `Request failed (${response.status})` : data.trim();
+      throw new Error(msg);
+    }
+    throw new Error(`Request failed (${response.status})`);
+  }
+  if (data === null || data === "") return {} as T;
+  return data as T;
 }
 
 export async function healthCheck() {
