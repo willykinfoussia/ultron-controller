@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SERVICE_NAME="${SERVICE_NAME:-ultron-controller}"
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FRONTEND_DIR="$ROOT_DIR/frontend"
 
 echo "==> Ultron deploy script"
