@@ -1272,3 +1272,58 @@ textarea.editor {
 .footer-name {
   opacity: 0.6;
 }
+
+/* ── Tree (OpenViking file explorer) ──────────────────── */
+.tree {
+  gap: 1px !important;
+}
+
+.tree-row {
+  border-radius: var(--r-sm) !important;
+  border-color: transparent !important;
+  background: transparent !important;
+  transition:
+    background var(--t-fast) var(--ease-out),
+    border-color var(--t-fast) var(--ease-out),
+    box-shadow var(--t-fast) var(--ease-out);
+}
+
+.tree-row:hover {
+  background: var(--surface-hover) !important;
+  border-color: var(--border-subtle) !important;
+}
+
+.tree-row.active {
+  background: var(--primary-sub) !important;
+  border-color: transparent !important;
+}
+
+.tree-dir .list-item-name {
+  color: var(--text);
+}
+
+.tree-file .list-item-name {
+  color: var(--text-2);
+  font-size: var(--text-sm);
+}
+
+.tree-chevron {
+  color: var(--text-3);
+  transition: transform 0.15s var(--ease-out), color 0.15s;
+}
+
+.tree-chevron:hover {
+  color: var(--text);
+}
+
+/* subtle guide line for nested levels */
+.tree-row::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--border-subtle);
+  opacity: 0.3;
+}

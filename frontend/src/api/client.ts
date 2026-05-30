@@ -287,6 +287,8 @@ export type OvNode = {
   is_dir?: boolean;
   name?: string;
   abstract?: string;
+  rel_path?: string;
+  children?: OvNode[];
   [key: string]: unknown;
 };
 
