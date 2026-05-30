@@ -18,7 +18,7 @@ from app.api.system_routes import router as system_router
 from app.core.config import Settings, get_settings
 from app.services.hermes_api_client import HermesApiClient
 
-APP_VERSION = "0.2.0"
+APP_VERSION = "0.3.0"
 
 
 @asynccontextmanager
