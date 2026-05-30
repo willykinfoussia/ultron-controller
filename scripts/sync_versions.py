@@ -21,11 +21,29 @@ def read_version(path: Path) -> str:
 
 def sync_backend(version: str) -> None:
     pyproject = ROOT / "backend" / "pyproject.toml"
-    text = pyproject.read_text(encoding="utf-8")
-    updated = re.sub(r'(?m)^version = "[^"]+"$', f'version = "{version}"', text, count=1)
-    if updated == text:
-        raise RuntimeError("Could not update backend/pyproject.toml version")
-    pyproject.write_text(updated, encoding="utf-8")
+    lines = pyproject.read_text(encoding="utf-8").splitlines()
+    in_project = False
+    changed = False
+    found = False
+    new_lines: list[str] = []
+
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("[") and stripped.endswith("]"):
+            in_project = stripped == "[project]"
+        if in_project and re.match(r'^\s*version\s*=\s*".*"\s*$', line):
+            found = True
+            target = f'version = "{version}"'
+            if line.strip() != target:
+                line = target
+                changed = True
+        new_lines.append(line)
+
+    if not found:
+        raise RuntimeError("Could not locate [project].version in backend/pyproject.toml")
+
+    if changed:
+        pyproject.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
 
 
 def sync_frontend(version: str) -> None:
