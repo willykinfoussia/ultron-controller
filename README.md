@@ -98,20 +98,20 @@ journalctl -u ultron-controller -f
 ## Script de deploiement rapide (git pull + frontend build + restart service)
 
 Script fourni:
-- `deploy/scripts/deploy_frontend_and_restart.sh`
+- `deploy/deploy_frontend_and_restart.sh`
 
 Usage sur le serveur:
 
 ```bash
 cd /home/opc/ultron-controller
-chmod +x deploy/scripts/deploy_frontend_and_restart.sh
-./deploy/scripts/deploy_frontend_and_restart.sh
+chmod +x deploy/deploy_frontend_and_restart.sh
+./deploy/deploy_frontend_and_restart.sh
 ```
 
 Optionnel (service custom):
 
 ```bash
-SERVICE_NAME=ultron-controller ./deploy/scripts/deploy_frontend_and_restart.sh
+SERVICE_NAME=ultron-controller ./deploy/deploy_frontend_and_restart.sh
 ```
 
 ## API principale
