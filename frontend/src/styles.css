@@ -1244,3 +1244,31 @@ textarea.editor {
   gap: var(--sp-2);
   flex-wrap: wrap;
 }
+
+/* ── Footer ──────────────────────────────────────────────── */
+.app-footer {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 12px 8px;
+  font-size: 11px;
+  color: var(--text-muted, rgba(150, 150, 170, 0.5));
+  border-top: 1px solid rgba(120, 120, 140, 0.10);
+  letter-spacing: 0.2px;
+  user-select: none;
+}
+
+.footer-version {
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+.footer-sep {
+  opacity: 0.4;
+}
+
+.footer-name {
+  opacity: 0.6;
+}

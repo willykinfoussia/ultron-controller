@@ -16,6 +16,7 @@ async def health() -> dict:
         openviking = {"error": str(exc)}
     return {
         "status": "ok",
+        "version": "0.2.0",
         "openviking": openviking,
         "hermes_home": str(settings.hermes_home),
         "memories_dir": str(settings.memories_dir),

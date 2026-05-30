@@ -1,3 +1,7 @@
+from contextlib import asynccontextmanager
+from collections.abc import AsyncGenerator
+
+import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
@@ -11,10 +15,29 @@ from app.api.search import router as search_router
 from app.api.sessions import router as sessions_router
 from app.api.storage_routes import router as storage_router
 from app.api.system_routes import router as system_router
-from app.core.config import get_settings
+from app.core.config import Settings, get_settings
+from app.services.hermes_api_client import HermesApiClient
+
+APP_VERSION = "0.2.0"
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    settings = get_settings()
+    shared_httpx = httpx.AsyncClient(
+        base_url=settings.hermes_api_base_url.rstrip("/"),
+        timeout=settings.hermes_api_timeout_sec,
+        headers={"Authorization": f"Bearer {settings.hermes_api_key}"},
+    )
+    app.state.hermes_api_client = HermesApiClient(
+        settings, shared_client=shared_httpx
+    )
+    yield
+    await shared_httpx.aclose()
+
 
 settings = get_settings()
-app = FastAPI(title="Ultron Controller", version="1.0.0")
+app = FastAPI(title="Ultron Controller", version=APP_VERSION, lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -31,6 +54,10 @@ app.include_router(sessions_router)
 app.include_router(search_router)
 app.include_router(system_router)
 app.include_router(storage_router)
+
+@app.get("/api/version", include_in_schema=False)
+async def version() -> dict:
+    return {"version": APP_VERSION}
 
 frontend_dist = settings.frontend_dist
 if frontend_dist.exists():

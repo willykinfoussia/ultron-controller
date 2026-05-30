@@ -57,8 +57,26 @@ const TABS: Array<{ id: TabId; label: string }> = [
 
 const TAB_IDS = TABS.map((t) => t.id);
 
+/* ── Version hook ─────────────────────────────────────────── */
+function useVersion() {
+  const [version, setVersion] = useState<string>("");
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/version")
+      .then((r) => r.json())
+      .then((d: Record<string, string>) => {
+        if (!cancelled && d.version) setVersion(d.version);
+      })
+      .catch(() => { /* silent */ });
+    return () => { cancelled = true; };
+  }, []);
+  return version;
+}
+
 /* ── App ─────────────────────────────────────────────────── */
 export default function App() {
+  const appVersion = useVersion();
+
   /* ── Preferences (persisted) ── */
   const [theme, setThemeState] = useState<Theme>(
     () => (localStorage.getItem("uc-theme") as Theme | null) ?? "dark"
@@ -221,6 +239,13 @@ export default function App() {
           {page}
         </motion.main>
       </AnimatePresence>
+
+      {/* ── Footer ── */}
+      <footer className="app-footer" role="contentinfo">
+        <span className="footer-version">v{appVersion || "—"}</span>
+        <span className="footer-sep" aria-hidden="true">·</span>
+        <span className="footer-name">Ultron Controller</span>
+      </footer>
 
       <Toast toast={toast} />
     </div>
