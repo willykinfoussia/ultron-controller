@@ -1,0 +1,20 @@
+[Unit]
+Description=Ultron Controller Backend (FastAPI + uv)
+After=network.target
+
+[Service]
+Type=simple
+User=opc
+Group=opc
+WorkingDirectory=/home/opc/ultron-controller/backend
+Environment=PATH=/home/opc/.local/bin:/usr/local/bin:/usr/bin
+Environment=ULTRON_OPENVIKING_ENDPOINT=http://127.0.0.1:1933
+Environment=ULTRON_HERMES_HOME=/home/opc/.hermes
+ExecStart=/usr/bin/env uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=10
+TimeoutStopSec=30
+KillSignal=SIGINT
+
+[Install]
+WantedBy=multi-user.target
