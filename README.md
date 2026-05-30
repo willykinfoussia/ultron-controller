@@ -90,6 +90,22 @@ npm run dev
 
 Le frontend Vite proxy les requetes `/api` vers `http://127.0.0.1:8000`.
 
+## Versioning centralise
+
+La version est pilotee par **deux fichiers uniques** :
+- backend : `backend/VERSION`
+- frontend : `frontend/VERSION`
+
+Pour propager ces versions partout (backend `pyproject.toml`, frontend `package.json` et `package-lock.json`) :
+
+```bash
+python scripts/sync_versions.py
+```
+
+Notes :
+- L'API backend (`/api/version` et `/api/health`) lit directement `backend/VERSION`.
+- Le script de deploiement `deploy/deploy_frontend_and_restart.sh` lance automatiquement `python scripts/sync_versions.py`.
+
 ## Build production
 
 ```bash

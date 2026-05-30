@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import type { ToastKind } from "../components/Toast";
 
 type AccentId = "indigo" | "blue" | "cyan" | "emerald" | "rose" | "amber";
@@ -31,7 +32,25 @@ export function SettingsPage({
   setToast: _setToast,
   appVersion,
 }: SettingsPageProps) {
-  void _setToast;
+  const [hermesSessionKey, setHermesSessionKey] = useState("");
+
+  useEffect(() => {
+    setHermesSessionKey(localStorage.getItem("uc-hermes-session-key") ?? "");
+  }, []);
+
+  function saveHermesSessionKey() {
+    const key = hermesSessionKey.trim();
+    if (key.length > 256) {
+      _setToast("Hermes Session Key too long (max 256 chars).", "error");
+      return;
+    }
+    if (/[\r\n\u0000]/.test(key)) {
+      _setToast("Hermes Session Key contains forbidden control characters.", "error");
+      return;
+    }
+    localStorage.setItem("uc-hermes-session-key", key);
+    _setToast("Hermes Session Key saved.", "success");
+  }
 
   return (
     <div className="page settings-page">
@@ -112,6 +131,32 @@ export function SettingsPage({
             <span className="settings-about-label">Version</span>
             <span className="settings-about-value mono">{appVersion || "—"}</span>
           </div>
+        </div>
+      </div>
+
+      {/* ── Hermes Session persistence ── */}
+      <div className="card">
+        <div className="card-header">
+          <span className="card-title">Hermes Session Persistence</span>
+        </div>
+        <div className="card-body" style={{ display: "flex", flexDirection: "column", gap: "var(--sp-3)" }}>
+          <p style={{ fontSize: "var(--text-sm)", color: "var(--text-3)" }}>
+            This key is used as <span className="mono">X-Hermes-Session-Key</span> to keep a stable
+            long-term memory scope across tabs/devices. Session UI state is restored for 24h.
+          </p>
+          <div style={{ display: "flex", gap: "var(--sp-2)", alignItems: "center", flexWrap: "wrap" }}>
+            <input
+              value={hermesSessionKey}
+              onChange={(e) => setHermesSessionKey(e.target.value)}
+              placeholder="agent:main:web:user-42"
+              maxLength={256}
+              style={{ flex: 1, minWidth: 260 }}
+            />
+            <button className="primary" onClick={saveHermesSessionKey}>Save</button>
+          </div>
+          <span style={{ fontSize: "var(--text-xs)", color: "var(--text-3)" }}>
+            Rules: max 256 chars, no newline/null characters.
+          </span>
         </div>
       </div>
     </div>

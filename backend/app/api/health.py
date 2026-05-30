@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.core.config import get_settings
+from app.core.version import get_app_version
 from app.services.openviking_client import OpenVikingClient
 
 router = APIRouter(prefix="/api", tags=["health"])
@@ -16,7 +17,7 @@ async def health() -> dict:
         openviking = {"error": str(exc)}
     return {
         "status": "ok",
-        "version": "0.3.0",
+        "version": get_app_version(),
         "openviking": openviking,
         "hermes_home": str(settings.hermes_home),
         "memories_dir": str(settings.memories_dir),

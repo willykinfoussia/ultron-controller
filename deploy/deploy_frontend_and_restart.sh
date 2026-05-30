@@ -19,6 +19,11 @@ if ! command -v git >/dev/null 2>&1; then
   exit 1
 fi
 
+if ! command -v python >/dev/null 2>&1; then
+  echo "Error: python is not installed or not in PATH."
+  exit 1
+fi
+
 if ! command -v systemctl >/dev/null 2>&1; then
   echo "Error: systemctl is not available on this host."
   exit 1
@@ -36,6 +41,10 @@ git pull --ff-only
 echo "==> Syncing backend dependencies..."
 cd "$ROOT_DIR/backend"
 uv sync
+
+echo "==> Syncing versions from backend/VERSION and frontend/VERSION..."
+cd "$ROOT_DIR"
+python scripts/sync_versions.py
 
 echo "==> Building frontend..."
 cd "$FRONTEND_DIR"

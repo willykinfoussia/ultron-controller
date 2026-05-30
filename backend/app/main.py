@@ -16,10 +16,8 @@ from app.api.sessions import router as sessions_router
 from app.api.storage_routes import router as storage_router
 from app.api.system_routes import router as system_router
 from app.core.config import Settings, get_settings
+from app.core.version import get_app_version
 from app.services.hermes_api_client import HermesApiClient
-
-APP_VERSION = "0.3.0"
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
@@ -37,7 +35,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 
 settings = get_settings()
-app = FastAPI(title="Ultron Controller", version=APP_VERSION, lifespan=lifespan)
+app = FastAPI(title="Ultron Controller", version=get_app_version(), lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -57,7 +55,7 @@ app.include_router(storage_router)
 
 @app.get("/api/version", include_in_schema=False)
 async def version() -> dict:
-    return {"version": APP_VERSION}
+    return {"version": get_app_version()}
 
 frontend_dist = settings.frontend_dist
 if frontend_dist.exists():

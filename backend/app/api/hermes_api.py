@@ -9,7 +9,11 @@ from app.services.hermes_api_client import HermesApiClient, extract_client_heade
 
 router = APIRouter(prefix="/api/hermes_api", tags=["hermes-api"])
 
-_SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+_SSE_HEADERS = {
+    "Cache-Control": "no-cache, no-transform",
+    "Connection": "keep-alive",
+    "X-Accel-Buffering": "no",
+}
 
 
 def _client(request: Request) -> HermesApiClient:
@@ -123,7 +127,7 @@ async def run_events(run_id: str, request: Request) -> StreamingResponse:
 
 @router.post("/v1/runs/{run_id}/stop")
 async def stop_run(request: Request, run_id: str) -> Any:
-    return await _client(request).post(f"/v1/runs/{run_id}/stop")
+    return await _client(request).post(f"/v1/runs/{run_id}/stop", extra=_extra(request))
 
 
 # ── Jobs API ──────────────────────────────────────────────────────────────────
@@ -189,30 +193,32 @@ async def list_hermes_sessions(
         params["source"] = source
     if include_children:
         params["include_children"] = "true"
-    return await _client(request).get("/api/sessions", params=params)
+    return await _client(request).get("/api/sessions", params=params, extra=_extra(request))
 
 
 @router.post("/sessions")
 async def create_hermes_session(request: Request) -> Any:
     body: dict = await request.json()
-    return await _client(request).post("/api/sessions", body=body)
+    return await _client(request).post("/api/sessions", body=body, extra=_extra(request))
 
 
 @router.get("/sessions/{session_id}")
 async def get_hermes_session(request: Request, session_id: str) -> Any:
-    return await _client(request).get(f"/api/sessions/{session_id}")
+    return await _client(request).get(f"/api/sessions/{session_id}", extra=_extra(request))
 
 
 @router.patch("/sessions/{session_id}")
 async def update_hermes_session(request: Request, session_id: str, body: Any = None) -> Any:
     if body is None:
         body = await request.json()
-    return await _client(request).patch(f"/api/sessions/{session_id}", body=body)
+    return await _client(request).patch(
+        f"/api/sessions/{session_id}", body=body, extra=_extra(request)
+    )
 
 
 @router.delete("/sessions/{session_id}")
 async def delete_hermes_session(request: Request, session_id: str) -> Any:
-    return await _client(request).delete(f"/api/sessions/{session_id}")
+    return await _client(request).delete(f"/api/sessions/{session_id}", extra=_extra(request))
 
 
 @router.get("/sessions/{session_id}/messages")
@@ -225,13 +231,16 @@ async def get_hermes_session_messages(
     return await _client(request).get(
         f"/api/sessions/{session_id}/messages",
         params={"limit": limit, "offset": offset},
+        extra=_extra(request),
     )
 
 
 @router.post("/sessions/{session_id}/fork")
 async def fork_hermes_session(request: Request, session_id: str) -> Any:
     body: dict = await request.json()
-    return await _client(request).post(f"/api/sessions/{session_id}/fork", body=body)
+    return await _client(request).post(
+        f"/api/sessions/{session_id}/fork", body=body, extra=_extra(request)
+    )
 
 
 @router.post("/sessions/{session_id}/chat")

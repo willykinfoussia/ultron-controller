@@ -1,9 +1,11 @@
 {
   "name": "ultron-controller-frontend",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "private": true,
   "type": "module",
   "scripts": {
+    "sync:version": "python ../scripts/sync_versions.py",
+    "prebuild": "python ../scripts/sync_versions.py",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview"

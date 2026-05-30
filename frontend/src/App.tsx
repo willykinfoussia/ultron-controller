@@ -263,13 +263,13 @@ export default function App() {
               className={`topbar-nav-link ${activeTab === "memory" ? "active" : ""}`}
               onClick={() => handleTabChange("memory")}
             >
-              hermes memory
+              Hermes Memory
             </button>
             <button
               className={`topbar-nav-link ${activeTab === "hermes" ? "active" : ""}`}
               onClick={() => handleTabChange("hermes")}
             >
-              hermes
+              Hermes
             </button>
           </div>
           <span className="topbar-title">

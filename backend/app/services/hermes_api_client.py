@@ -222,7 +222,7 @@ class HermesApiClient:
         try:
             if self._shared_client is not None:
                 async with self._shared_client.stream(
-                    "GET", url, params=params, headers=headers
+                    "GET", url, params=params, headers=headers, timeout=None
                 ) as resp:
                     if resp.status_code >= 400:
                         body = await resp.aread()
@@ -233,7 +233,7 @@ class HermesApiClient:
             else:
                 async with httpx.AsyncClient(timeout=self._timeout) as client:
                     async with client.stream(
-                        "GET", url, params=params, headers=headers
+                        "GET", url, params=params, headers=headers, timeout=None
                     ) as resp:
                         if resp.status_code >= 400:
                             body = await resp.aread()
@@ -256,7 +256,7 @@ class HermesApiClient:
         try:
             if self._shared_client is not None:
                 async with self._shared_client.stream(
-                    "POST", url, json=body, headers=headers
+                    "POST", url, json=body, headers=headers, timeout=None
                 ) as resp:
                     if resp.status_code >= 400:
                         err_body = await resp.aread()
@@ -267,7 +267,7 @@ class HermesApiClient:
             else:
                 async with httpx.AsyncClient(timeout=self._timeout) as client:
                     async with client.stream(
-                        "POST", url, json=body, headers=headers
+                        "POST", url, json=body, headers=headers, timeout=None
                     ) as resp:
                         if resp.status_code >= 400:
                             err_body = await resp.aread()

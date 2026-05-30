@@ -42,6 +42,12 @@ import {
 } from "../api/client";
 import { Spinner } from "../components/Spinner";
 import type { ToastKind } from "../components/Toast";
+import {
+  clearHermesSessionState,
+  readHermesSessionState,
+  touchHermesSessionState,
+  writeHermesSessionState,
+} from "../state/hermesSessionStore";
 
 /* ── Types ──────────────────────────────────────────────── */
 
@@ -81,6 +87,15 @@ function fmtDate(iso?: string | null) {
   } catch { return iso; }
 }
 
+function formatTtl(ms: number) {
+  if (ms <= 0) return "expired";
+  const total = Math.floor(ms / 1000);
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${minutes}m`;
+}
+
 /* ═══════════════════════════════════════════════════════════
    CHAT VIEW
    ═══════════════════════════════════════════════════════════ */
@@ -91,15 +106,122 @@ function ChatView({ setToast }: Props) {
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [sessionKey, setSessionKey] = useState("");
-  const [conversationMode, setConversationMode] = useState<"stateless" | "session">("stateless");
+  const [conversationMode, setConversationMode] = useState<"stateless" | "session">("session");
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [activeRunId, setActiveRunId] = useState<string | null>(null);
+  const [showRestoredBadge, setShowRestoredBadge] = useState(false);
+  const [ttlRemainingMs, setTtlRemainingMs] = useState<number | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const isRestoringRef = useRef(false);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    const persisted = readHermesSessionState();
+    const savedKey = localStorage.getItem("uc-hermes-session-key") ?? "";
+    setConversationMode(persisted.conversationMode);
+    setActiveSessionId(persisted.activeSessionId);
+    setActiveRunId(persisted.activeRunId);
+    setSessionKey(savedKey || persisted.sessionKey || "");
+    setTtlRemainingMs(Math.max(0, persisted.expiresAt - Date.now()));
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("uc-hermes-session-key", sessionKey);
+    writeHermesSessionState({ sessionKey });
+  }, [sessionKey]);
+
+  useEffect(() => {
+    writeHermesSessionState({
+      activeSessionId,
+      activeRunId,
+      conversationMode,
+      sessionKey,
+    });
+    const persisted = readHermesSessionState();
+    setTtlRemainingMs(Math.max(0, persisted.expiresAt - Date.now()));
+  }, [activeSessionId, activeRunId, conversationMode, sessionKey]);
+
+  useEffect(() => {
+    const updateTtl = () => {
+      const persisted = readHermesSessionState();
+      setTtlRemainingMs(Math.max(0, persisted.expiresAt - Date.now()));
+    };
+    const id = window.setInterval(updateTtl, 30000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    const onStorage = (ev: StorageEvent) => {
+      if (ev.key === "uc-hermes-session-key" && typeof ev.newValue === "string") {
+        setSessionKey(ev.newValue);
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  useEffect(() => {
+    if (!activeSessionId || isRestoringRef.current) return;
+    isRestoringRef.current = true;
+    const restore = async () => {
+      try {
+        await waitForHermesHealth();
+        const sessionData = await hermesGetSessionMessages(activeSessionId, 500);
+        const recovered = normalizeSessionMessages(sessionData);
+        setMessages(recovered);
+        touchHermesSessionState();
+        setShowRestoredBadge(true);
+
+        if (!activeRunId) return;
+        const run = await hermesGetRun(activeRunId);
+        if (run.status === "started" || run.status === "running" || run.status === "stopping") {
+          const assistantId = appendStreamingPlaceholder();
+          await streamRun(activeRunId, assistantId);
+        } else {
+          setActiveRunId(null);
+          writeHermesSessionState({ activeRunId: null });
+        }
+      } catch (err) {
+        setToast(String(err), "error");
+      } finally {
+        isRestoringRef.current = false;
+      }
+    };
+    restore().catch(() => undefined);
+  }, [activeSessionId, activeRunId, setToast]);
+
+  useEffect(() => {
+    if (!showRestoredBadge) return;
+    const id = window.setTimeout(() => setShowRestoredBadge(false), 8000);
+    return () => window.clearTimeout(id);
+  }, [showRestoredBadge]);
+
+  async function waitForHermesHealth() {
+    const delays = [0, 500, 1000, 2000, 3000];
+    let lastError: unknown;
+    for (const ms of delays) {
+      if (ms) await new Promise((resolve) => setTimeout(resolve, ms));
+      try {
+        await hermesApiHealth();
+        return;
+      } catch (err) {
+        lastError = err;
+      }
+    }
+    throw lastError ?? new Error("Hermes API is unavailable");
+  }
+
+  useEffect(() => {
+    return () => {
+      // Detach from stream when leaving page. The run keeps executing server-side.
+      abortRef.current?.abort();
+    };
+  }, []);
 
   function stop() {
     abortRef.current?.abort();
@@ -110,6 +232,14 @@ function ChatView({ setToast }: Props) {
     if (!text || streaming) return;
     setInput("");
     if (textareaRef.current) textareaRef.current.style.height = "auto";
+
+    let sessionId = activeSessionId;
+    if (!sessionId) {
+      const created = await hermesCreateSession({ title: "Dashboard chat" });
+      sessionId = (created as HermesAgentSession).id;
+      setActiveSessionId(sessionId);
+      setConversationMode("session");
+    }
 
     const userMsg: LocalMsg = { id: uid(), role: "user", content: text };
     const assistantId = uid();
@@ -128,18 +258,23 @@ function ChatView({ setToast }: Props) {
     abortRef.current = controller;
 
     try {
-      if (conversationMode === "session" && activeSessionId) {
-        for await (const chunk of hermesSessionChatStream(activeSessionId, text, controller.signal)) {
-          applyChunk(assistantId, chunk);
-        }
-      } else {
+      if (conversationMode === "stateless") {
         const history: HermesChatMessage[] = [
           ...messages.map((m) => ({ role: m.role, content: m.content })),
           { role: "user", content: text },
         ];
         for await (const chunk of hermesChatStream(history, controller.signal, sessionKey || undefined)) {
           applyChunk(assistantId, chunk);
+          touchHermesSessionState();
         }
+      } else if (sessionId) {
+        const run = await hermesCreateRun({ input: text, session_id: sessionId }, sessionKey || undefined);
+        const runId = run.run_id;
+        setActiveRunId(runId);
+        writeHermesSessionState({ activeSessionId: sessionId, activeRunId: runId, conversationMode: "session" });
+        await streamRun(runId, assistantId);
+        const sessionData = await hermesGetSessionMessages(sessionId, 500);
+        setMessages(normalizeSessionMessages(sessionData));
       }
     } catch (err: unknown) {
       if (!controller.signal.aborted) {
@@ -151,6 +286,8 @@ function ChatView({ setToast }: Props) {
         );
       }
     } finally {
+      setActiveRunId(null);
+      writeHermesSessionState({ activeRunId: null });
       setMessages((prev) =>
         prev.map((m) => (m.id === assistantId ? { ...m, streaming: false } : m)),
       );
@@ -175,6 +312,56 @@ function ChatView({ setToast }: Props) {
     }
   }
 
+  function appendStreamingPlaceholder() {
+    const assistantId = uid();
+    setMessages((prev) => {
+      const last = prev[prev.length - 1];
+      if (last?.streaming) return prev;
+      return [
+        ...prev,
+        { id: assistantId, role: "assistant", content: "", streaming: true, toolEvents: [] },
+      ];
+    });
+    return assistantId;
+  }
+
+  async function streamRun(runId: string, assistantId: string) {
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setStreaming(true);
+    try {
+      for await (const ev of hermesRunEventStream(runId, controller.signal)) {
+        if (ev.kind === "token") {
+          applyChunk(assistantId, { kind: "text", text: ev.text });
+        } else if (ev.kind === "tool") {
+          applyChunk(assistantId, { kind: "tool_progress", content: ev.content });
+        } else if (ev.kind === "error") {
+          throw new Error(ev.message);
+        }
+        touchHermesSessionState();
+      }
+    } finally {
+      setStreaming(false);
+      abortRef.current = null;
+    }
+  }
+
+  function normalizeSessionMessages(payload: unknown): LocalMsg[] {
+    const raw = (Array.isArray(payload)
+      ? payload
+      : (payload as { messages?: SessionMessage[] }).messages) ?? [];
+    return raw.map((m) => ({
+      id: String(m.id),
+      role:
+        m.role === "assistant" || m.role === "system"
+          ? m.role
+          : "user",
+      content: m.content_text ?? m.content ?? "",
+      streaming: false,
+      toolEvents: m.tool_calls ? [m.tool_calls] : [],
+    }));
+  }
+
   function handleKey(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
@@ -194,7 +381,29 @@ function ChatView({ setToast }: Props) {
       const id = (s as HermesAgentSession).id;
       setActiveSessionId(id);
       setConversationMode("session");
+      writeHermesSessionState({ activeSessionId: id, conversationMode: "session" });
       setToast(`Session created: ${id.slice(0, 8)}…`, "success");
+    } catch (err) {
+      setToast(String(err), "error");
+    }
+  }
+
+  async function reconnectRun() {
+    if (!activeRunId || !activeSessionId || streaming) return;
+    try {
+      await waitForHermesHealth();
+      const run = await hermesGetRun(activeRunId);
+      if (!(run.status === "started" || run.status === "running" || run.status === "stopping")) {
+        setActiveRunId(null);
+        writeHermesSessionState({ activeRunId: null });
+        setToast("No active run to reconnect.", "info");
+        return;
+      }
+      const assistantId = appendStreamingPlaceholder();
+      await streamRun(activeRunId, assistantId);
+      const sessionData = await hermesGetSessionMessages(activeSessionId, 500);
+      setMessages(normalizeSessionMessages(sessionData));
+      setToast("Run stream reconnected.", "success");
     } catch (err) {
       setToast(String(err), "error");
     }
@@ -202,8 +411,10 @@ function ChatView({ setToast }: Props) {
 
   function clearChat() {
     setMessages([]);
+    setActiveRunId(null);
     setActiveSessionId(null);
     setConversationMode("stateless");
+    clearHermesSessionState();
   }
 
   return (
@@ -243,6 +454,18 @@ function ChatView({ setToast }: Props) {
               </span>
             )}
 
+            {showRestoredBadge && (
+              <span className="badge warning" title="Recovered from local persisted session">
+                restored
+              </span>
+            )}
+
+            {ttlRemainingMs !== null && activeSessionId && (
+              <span className="badge" title="Local persistence TTL">
+                ttl {formatTtl(ttlRemainingMs)}
+              </span>
+            )}
+
             <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)", flex: 1, minWidth: 200 }}>
               <label style={{ fontSize: "var(--text-xs)", color: "var(--text-3)", whiteSpace: "nowrap" }}>
                 Session key
@@ -254,6 +477,12 @@ function ChatView({ setToast }: Props) {
                 style={{ height: 28, fontSize: "var(--text-sm)" }}
               />
             </div>
+
+            {activeRunId && !streaming && (
+              <button onClick={() => reconnectRun().catch(() => undefined)}>
+                Reconnect run
+              </button>
+            )}
 
             <button onClick={clearChat} className="btn-ghost" style={{ marginLeft: "auto" }}>
               Clear
@@ -391,7 +620,7 @@ function RunsView({ setToast }: Props) {
       const res = await hermesCreateRun({
         input: input.trim(),
         ...(instructions.trim() ? { instructions: instructions.trim() } : {}),
-      });
+      }, localStorage.getItem("uc-hermes-session-key") || undefined);
       const { run_id } = res as { run_id: string };
       const entry: RunEntry = { runId: run_id, input: input.trim(), status: "started", events: [] };
       setRuns((prev) => [entry, ...prev]);

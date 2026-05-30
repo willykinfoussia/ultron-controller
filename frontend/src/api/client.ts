@@ -506,6 +506,14 @@ export async function* hermesRunEventStream(
     } else {
       try {
         const data = JSON.parse(ev.data) as Record<string, unknown>;
+        // OpenAI Responses-flavored event names can carry deltas.
+        if (
+          ev.event === "response.output_text.delta" &&
+          typeof data.delta === "string"
+        ) {
+          yield { kind: "token", text: data.delta };
+          continue;
+        }
         if (ev.event === "run.completed" || (data as { status?: string }).status === "completed") {
           yield { kind: "done", output: String(data.output ?? "") };
         } else if (ev.event === "tool.started" || ev.event === "tool.completed") {
@@ -623,10 +631,12 @@ export async function hermesCreateRun(body: {
   session_id?: string;
   instructions?: string;
   previous_response_id?: string;
-}) {
+}, sessionKey?: string) {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (sessionKey) headers["X-Hermes-Session-Key"] = sessionKey;
   return request<{ run_id: string; status: string }>("/api/hermes_api/v1/runs", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(body),
   });
 }
