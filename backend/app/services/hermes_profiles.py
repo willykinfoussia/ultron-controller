@@ -88,7 +88,16 @@ class HermesProfilesService:
             soul_path.write_text(content, encoding="utf-8")
         return {"status": "ok", "path": str(soul_path)}
 
-    def list_memories(self, name: str) -> dict:
+    def list_memories(
+        self,
+        name: str,
+        *,
+        search: str | None = None,
+        sort: str = "mtime",
+        sort_dir: str = "desc",
+        limit: int = 50,
+        offset: int = 0,
+    ) -> dict:
         profile_dir = self._profile_dir(name)
         mem_dir = profile_dir / "memories"
         files = []
@@ -100,6 +109,8 @@ class HermesProfilesService:
                     validate_memory_file(fp)
                 except HTTPException:
                     continue
+                if search and search.lower() not in fp.name.lower():
+                    continue
                 files.append(
                     {
                         "name": fp.name,
@@ -108,7 +119,19 @@ class HermesProfilesService:
                         "kind": "memory",
                     }
                 )
-        return {"dir": str(mem_dir), "files": files}
+
+        # Sort
+        reverse = sort_dir == "desc"
+        if sort == "name":
+            files.sort(key=lambda f: f["name"].lower(), reverse=reverse)
+        elif sort == "size":
+            files.sort(key=lambda f: f["size"], reverse=reverse)
+        else:  # mtime
+            files.sort(key=lambda f: f["mtime"], reverse=reverse)
+
+        total = len(files)
+        paginated = files[offset : offset + limit]
+        return {"dir": str(mem_dir), "files": paginated, "total": total, "limit": limit, "offset": offset}
 
     def read_memory(self, name: str, filename: str) -> dict:
         profile_dir = self._profile_dir(name)

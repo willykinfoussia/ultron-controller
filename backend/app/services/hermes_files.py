@@ -14,32 +14,70 @@ class HermesFilesService:
         self._memories_dir = settings.memories_dir
         self._pinned_files = set(settings.pinned_files)
 
-    def list_memory_files(self) -> dict:
-        files = []
-        if self._memories_dir.exists():
-            for file_path in sorted(
-                self._memories_dir.iterdir(),
-                key=lambda item: item.stat().st_mtime,
-                reverse=True,
-            ):
-                if file_path.is_file():
-                    try:
-                        validate_memory_file(file_path)
-                    except HTTPException:
-                        continue
-                    files.append(
-                        {
-                            "name": file_path.name,
-                            "size": file_path.stat().st_size,
-                            "mtime": file_path.stat().st_mtime,
-                            "kind": "memory",
-                        }
-                    )
-        return {"dir": str(self._memories_dir), "files": files}
+    def _list_directory_files(
+        self,
+        dir_path: Path,
+        *,
+        allowed_names: set[str] | None = None,
+        default_kind: str = "memory",
+        search: str | None = None,
+        sort: str = "mtime",
+        sort_dir: str = "desc",
+        limit: int = 50,
+        offset: int = 0,
+    ) -> dict:
+        """Core file listing with filtering, sorting, and pagination."""
+        files: list[dict] = []
+        if dir_path.exists():
+            for file_path in dir_path.iterdir():
+                if not file_path.is_file():
+                    continue
+                if allowed_names is not None and file_path.name not in allowed_names:
+                    continue
+                try:
+                    validate_memory_file(file_path)
+                except HTTPException:
+                    continue
+                # Apply search filter before pagination
+                if search and search.lower() not in file_path.name.lower():
+                    continue
+                stat = file_path.stat()
+                files.append(
+                    {
+                        "name": file_path.name,
+                        "size": stat.st_size,
+                        "mtime": stat.st_mtime,
+                        "kind": default_kind,
+                    }
+                )
 
-    def list_pinned_files(self) -> dict:
-        files = []
+        # Sort
+        reverse = sort_dir == "desc"
+        if sort == "name":
+            files.sort(key=lambda f: f["name"].lower(), reverse=reverse)
+        elif sort == "size":
+            files.sort(key=lambda f: f["size"], reverse=reverse)
+        else:  # mtime
+            files.sort(key=lambda f: f["mtime"], reverse=reverse)
+
+        total = len(files)
+        paginated = files[offset : offset + limit]
+        return {"dir": str(dir_path), "files": paginated, "total": total, "limit": limit, "offset": offset}
+
+    def _list_pinned_files(
+        self,
+        *,
+        search: str | None = None,
+        sort: str = "name",
+        sort_dir: str = "asc",
+        limit: int = 50,
+        offset: int = 0,
+    ) -> dict:
+        """List pinned files with filtering, sorting, and pagination."""
+        files: list[dict] = []
         for file_name in sorted(self._pinned_files):
+            if search and search.lower() not in file_name.lower():
+                continue
             file_path = self._home / file_name
             files.append(
                 {
@@ -50,7 +88,138 @@ class HermesFilesService:
                     "kind": "pinned",
                 }
             )
-        return {"dir": str(self._home), "files": files}
+
+        # Sort pinned: sort by existence first (present before absent), then by field
+        reverse = sort_dir == "desc"
+        if sort == "name":
+            # Pinned files: present first, then alphabetical
+            files.sort(
+                key=lambda f: (not f["exists"], f["name"].lower()),
+                reverse=False,
+            )
+            if reverse:
+                files.reverse()
+        elif sort == "size":
+            files.sort(key=lambda f: (f["size"] if f["exists"] else -1), reverse=reverse)
+        else:  # mtime — None mtime sorts last
+            files.sort(
+                key=lambda f: (f["mtime"] is None, f["mtime"] or 0),
+                reverse=reverse,
+            )
+
+        total = len(files)
+        paginated = files[offset : offset + limit]
+        return {"dir": str(self._home), "files": paginated, "total": total, "limit": limit, "offset": offset}
+
+    def list_memory_files(
+        self,
+        *,
+        search: str | None = None,
+        sort: str = "mtime",
+        sort_dir: str = "desc",
+        limit: int = 50,
+        offset: int = 0,
+    ) -> dict:
+        return self._list_directory_files(
+            self._memories_dir,
+            default_kind="memory",
+            search=search,
+            sort=sort,
+            sort_dir=sort_dir,
+            limit=limit,
+            offset=offset,
+        )
+
+    def list_pinned_files(
+        self,
+        *,
+        search: str | None = None,
+        sort: str = "name",
+        sort_dir: str = "asc",
+        limit: int = 50,
+        offset: int = 0,
+    ) -> dict:
+        return self._list_pinned_files(
+            search=search,
+            sort=sort,
+            sort_dir=sort_dir,
+            limit=limit,
+            offset=offset,
+        )
+
+    def search_all_files(self, *, query: str, limit: int = 20) -> dict:
+        """Unified search across global memories, pinned files, and profile memories."""
+        # Search global memories
+        mem_results = self._list_directory_files(
+            self._memories_dir,
+            default_kind="memory",
+            search=query,
+            sort="name",
+            sort_dir="asc",
+            limit=limit,
+            offset=0,
+        )
+
+        # Search pinned files
+        pinned_results = self._list_pinned_files(
+            search=query,
+            sort="name",
+            sort_dir="asc",
+            limit=limit,
+            offset=0,
+        )
+
+        # Search profile memories
+        profile_results: list[dict] = []
+        profiles_dir = self._home / "profiles"
+        if profiles_dir.exists():
+            for pdir in sorted(profiles_dir.iterdir()):
+                if not pdir.is_dir():
+                    continue
+                # Check SOUL.md
+                soul_path = pdir / "SOUL.md"
+                if soul_path.is_file() and query.lower() in "SOUL.md".lower():
+                    profile_results.append(
+                        {
+                            "profile": pdir.name,
+                            "name": "SOUL.md",
+                            "kind": "soul",
+                            "path": str(soul_path),
+                        }
+                    )
+                # Check memory files in profile
+                mem_dir = pdir / "memories"
+                if mem_dir.exists():
+                    for fp in sorted(mem_dir.iterdir()):
+                        if not fp.is_file():
+                            continue
+                        if query.lower() in fp.name.lower():
+                            try:
+                                validate_memory_file(fp)
+                            except HTTPException:
+                                continue
+                            profile_results.append(
+                                {
+                                    "profile": pdir.name,
+                                    "name": fp.name,
+                                    "kind": "memory",
+                                    "path": str(fp),
+                                }
+                            )
+
+        return {
+            "query": query,
+            "results": {
+                "memories": mem_results["files"],
+                "pinned": pinned_results["files"],
+                "profiles": profile_results[:limit],
+            },
+            "counts": {
+                "memories": len(mem_results["files"]),
+                "pinned": len(pinned_results["files"]),
+                "profiles": len(profile_results[:limit]),
+            },
+        }
 
     def read_memory_file(self, name: str) -> dict:
         path = safe_join(self._memories_dir, name)
