@@ -1937,3 +1937,702 @@ textarea.editor {
   color: var(--text-3);
   margin-left: auto;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   MEMORY PAGE v2 — UI MOCKUP IMPLEMENTATION (component-based)
+   Search, Preview, Breadcrumbs, Status dots, Footer, Banner
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Page layout ───────────────────────────────────────── */
+.mem-page {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ── Unsaved banner ─────────────────────────────────────── */
+.unsaved-banner {
+  background: var(--warning-sub);
+  border-bottom: 1px solid var(--warning-border);
+  overflow: hidden;
+}
+
+.unsaved-banner-inner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+}
+
+.unsaved-banner-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.unsaved-banner-text {
+  font-size: var(--text-sm);
+  color: var(--warning);
+  flex: 1;
+}
+
+.unsaved-banner-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* ── Tab bar with badges ───────────────────────────────── */
+.tab-bar {
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 0;
+  background: var(--surface);
+  flex-shrink: 0;
+}
+
+.tab-btn {
+  position: relative;
+  padding: 10px 18px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text-2);
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+  font-family: var(--font);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tab-btn:hover {
+  color: var(--text);
+}
+
+.tab-btn.active {
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.tab-btn-label {
+  white-space: nowrap;
+}
+
+.tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  background: var(--primary-sub);
+  color: var(--primary);
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: 999px;
+  line-height: 1;
+}
+
+.tab-badge.warning {
+  background: var(--warning-sub);
+  color: var(--warning);
+}
+
+.tab-badge.danger {
+  background: var(--danger-sub);
+  color: var(--danger);
+}
+
+.tab-indicator {
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--primary);
+  border-radius: 1px 1px 0 0;
+}
+
+/* ── Toolbar (search row) ───────────────────────────────── */
+.mem-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.mem-toolbar-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.mem-toolbar-actions button {
+  padding: 5px 12px;
+  font-size: var(--text-sm);
+}
+
+/* ── Search bar ─────────────────────────────────────────── */
+.search-bar {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  padding: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  transition: border-color var(--t-fast) var(--ease-out),
+              box-shadow var(--t-fast) var(--ease-out);
+  position: relative;
+  min-width: 0;
+}
+
+.search-bar--focused {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-ring);
+}
+
+.search-bar--has-value {
+  border-color: var(--border);
+}
+
+.search-bar-icon {
+  position: absolute;
+  left: 10px;
+  font-size: 13px;
+  color: var(--text-3);
+  pointer-events: none;
+}
+
+.search-bar-input {
+  flex: 1;
+  padding: 7px 56px 7px 30px;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: var(--text-sm);
+  outline: none;
+  min-width: 0;
+}
+
+.search-bar-input::placeholder {
+  color: var(--text-3);
+}
+
+.search-bar-clear {
+  position: absolute;
+  right: 30px;
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  color: var(--text-3);
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: var(--r-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--t-fast), color var(--t-fast);
+}
+
+.search-bar-clear:hover {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.search-bar-count {
+  position: absolute;
+  right: 56px;
+  font-size: 11px;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
+.search-bar-kbd {
+  position: absolute;
+  right: 8px;
+  padding: 1px 5px;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  font-size: 10px;
+  color: var(--text-3);
+  pointer-events: none;
+}
+
+/* ── Breadcrumb ─────────────────────────────────────────── */
+.breadcrumb {
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.breadcrumb-list {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: var(--text-xs);
+  color: var(--text-3);
+}
+
+.breadcrumb-sep {
+  color: var(--border-strong);
+  user-select: none;
+  font-size: 12px;
+}
+
+.breadcrumb-item {
+  display: inline-flex;
+}
+
+.breadcrumb-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-2);
+  font-family: var(--font);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  border-radius: var(--r-sm);
+  transition: color var(--t-fast), background var(--t-fast);
+}
+
+.breadcrumb-link:hover {
+  color: var(--primary);
+  background: var(--primary-sub);
+}
+
+.breadcrumb-current {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 4px;
+}
+
+.breadcrumb-current.is-active {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.breadcrumb-icon {
+  font-size: 11px;
+}
+
+.breadcrumb-label {
+  white-space: nowrap;
+}
+
+/* ── File tree (replaces plain .list) ──────────────────── */
+.file-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.file-tree-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: background var(--t-fast) var(--ease-out),
+              border-color var(--t-fast) var(--ease-out);
+  background: transparent;
+  text-align: left;
+  width: 100%;
+  font-family: var(--font);
+  font-size: var(--text-sm);
+  color: var(--text-2);
+  min-height: 32px;
+}
+
+.file-tree-item:hover {
+  background: var(--surface-hover);
+  border-color: var(--border-subtle);
+}
+
+.file-tree-item.active {
+  background: var(--primary-sub);
+  border-color: transparent;
+  color: var(--text);
+}
+
+.file-tree-item.is-hovered {
+  background: var(--surface-hover);
+}
+
+.file-tree-item.is-dir {
+  font-weight: 500;
+  color: var(--text);
+}
+
+.file-tree-chevron {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 9px;
+  color: var(--text-3);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.15s var(--ease-out);
+  padding: 0;
+}
+
+.file-tree-chevron.is-open {
+  transform: rotate(90deg);
+}
+
+.file-tree-chevron--placeholder {
+  pointer-events: none;
+}
+
+.file-tree-icon {
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.file-tree-name {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--text-sm);
+}
+
+.file-tree-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  background: var(--surface-3);
+  color: var(--text-2);
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: 999px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.file-tree-badge.warning {
+  background: var(--warning-sub);
+  color: var(--warning);
+}
+
+.file-tree-badge.danger {
+  background: var(--danger-sub);
+  color: var(--danger);
+}
+
+.file-tree-meta {
+  font-size: var(--text-xs);
+  color: var(--text-3);
+  flex-shrink: 0;
+  margin-left: 4px;
+}
+
+.file-tree-actions {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity var(--t-fast);
+  flex-shrink: 0;
+}
+
+.file-tree-actions.is-visible {
+  opacity: 1;
+}
+
+.file-tree-item:hover .file-tree-actions {
+  opacity: 1;
+}
+
+/* ── Badge (generic) ───────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: 999px;
+  line-height: 1;
+}
+
+/* ── Editor panel ──────────────────────────────────────── */
+.mem-editor-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.mem-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+
+.mem-editor-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.mem-editor-title {
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mem-editor-subtitle {
+  font-size: var(--text-xs);
+  color: var(--text-3);
+}
+
+.mem-editor-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.mem-editor-body--edit {
+  display: block;
+}
+
+.mem-editor-body--preview {
+  display: block;
+}
+
+.mem-editor-body--split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--border);
+}
+
+.mem-editor-pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.mem-editor-pane .editor {
+  flex: 1;
+  min-height: 200px;
+  resize: none;
+}
+
+.mem-preview-pane {
+  padding: 16px;
+  overflow-y: auto;
+  background: var(--bg);
+  min-height: 200px;
+}
+
+/* ── Markdown preview toggle ────────────────────────────── */
+.md-toggle {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+
+.md-toggle-btn {
+  position: relative;
+  padding: 4px 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-2);
+  font-family: var(--font);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: background var(--t-fast), color var(--t-fast);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.md-toggle-btn:first-child {
+  border-right: 1px solid var(--border);
+}
+
+.md-toggle-btn:nth-child(2) {
+  border-right: 1px solid var(--border);
+}
+
+.md-toggle-btn:hover {
+  color: var(--text);
+}
+
+.md-toggle-btn.active {
+  background: var(--surface-3);
+  color: var(--text);
+  font-weight: 500;
+}
+
+.md-toggle-icon {
+  font-size: 12px;
+}
+
+.md-toggle-label {
+  font-size: var(--text-xs);
+}
+
+.md-toggle-indicator {
+  position: absolute;
+  bottom: 0;
+  left: 4px;
+  right: 4px;
+  height: 2px;
+  background: var(--primary);
+  border-radius: 1px 1px 0 0;
+}
+
+/* ── Editor footer ─────────────────────────────────────── */
+.editor-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 12px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--surface);
+  font-size: var(--text-xs);
+  color: var(--text-3);
+  min-height: 28px;
+  flex-shrink: 0;
+}
+
+.editor-footer-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 120px;
+}
+
+.editor-footer-dirty {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--warning);
+}
+
+.editor-footer-saving {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-2);
+}
+
+.editor-footer-saved {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--success);
+}
+
+.editor-footer-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.editor-footer-dot--unsaved {
+  background: var(--warning);
+}
+
+.editor-footer-dot--saving {
+  background: var(--text-3);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.editor-footer-dot--saved {
+  background: var(--success);
+}
+
+.editor-footer-stats {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.editor-footer-stat {
+  white-space: nowrap;
+}
+
+.editor-footer-stat-sep {
+  color: var(--border-strong);
+  user-select: none;
+}
+
+.editor-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 80px;
+  justify-content: flex-end;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* ── Ghost button ──────────────────────────────────────── */
+.btn-ghost {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-2);
+  font-family: var(--font);
+  font-size: var(--text-sm);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+.btn-ghost:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
