@@ -547,7 +547,7 @@ export function MemoryPage({ setToast }: MemoryPageProps) {
                       <SkeletonList count={6} />
                     </motion.div>
                   ) : (
-                    <motion.key="lists" {...motionProps} transition={motionT}>
+                    <motion.div key="lists" {...motionProps} transition={motionT}>
                       <div className="file-tree" role="tree" aria-label="Memory files">
                         {/* Pinned files */}
                         <p className="section-label">Pinned files</p>
