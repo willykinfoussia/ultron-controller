@@ -16,6 +16,7 @@ from app.api.search import router as search_router
 from app.api.sessions import router as sessions_router
 from app.api.storage_routes import router as storage_router
 from app.api.system_routes import router as system_router
+from app.api.kanban import router as kanban_router
 from app.core.config import Settings, get_settings
 from app.core.version import get_app_version
 from app.services.hermes_api_client import HermesApiClient
@@ -53,6 +54,7 @@ app.include_router(hermes_profiles_router)
 app.include_router(sessions_router)
 app.include_router(search_router)
 app.include_router(system_router)
+app.include_router(kanban_router)
 app.include_router(storage_router)
 
 @app.get("/api/version", include_in_schema=False)

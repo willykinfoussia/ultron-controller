@@ -859,3 +859,161 @@ export async function hermesSessionChat(id: string, input: string) {
     body: JSON.stringify({ input }),
   });
 }
+
+/* ═══════════════════════════════════════════════════════════
+   KANBAN ACTIVITY PAGE — types + API functions
+   All calls go through /api/kanban
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Types ──────────────────────────────────────────────── */
+
+export type KanbanSummary = {
+  total_boards: number;
+  total_tasks: number;
+  tasks_by_status: {
+    done: number;
+    running: number;
+    todo: number;
+    blocked: number;
+    triage: number;
+  };
+  completion_rate: number;
+  active_agents: number;
+  blocked_count: number;
+};
+
+export type KanbanStatusEntry = {
+  status: string;
+  count: number;
+};
+
+export type KanbanBoard = {
+  board_id: string;
+  board_name: string;
+  total_tasks: number;
+  statuses: KanbanStatusEntry[];
+  done: number;
+  running: number;
+  todo: number;
+  blocked: number;
+  triage: number;
+};
+
+export type KanbanBoardDetail = {
+  board_id: string;
+  board_name: string;
+  total: number;
+  limit: number;
+  offset: number;
+  filters: {
+    status: string | null;
+    assignee: string | null;
+    priority: number | null;
+    sort: string;
+    sort_dir: string;
+  };
+  tasks: Array<{
+    id: string;
+    title: string;
+    body: string | null;
+    assignee: string | null;
+    status: string;
+    priority: number;
+    created_by: string;
+    created_at: number;
+    started_at: number | null;
+    completed_at: number | null;
+    workspace_kind: string | null;
+    tenant: string | null;
+    result: string | null;
+  }>;
+};
+
+export type KanbanAgent = {
+  assignee: string;
+  total_tasks: number;
+  active_tasks: number;
+  completed_24h: number;
+  completed_7d: number;
+  completed_30d: number;
+};
+
+export type KanbanActivityEvent = {
+  id: number;
+  task_id: string | null;
+  run_id: string | null;
+  kind: string;
+  payload: string;
+  created_at: number;
+  task_title: string | null;
+  task_assignee: string | null;
+  task_status: string | null;
+};
+
+export type KanbanActivityResponse = {
+  total: number;
+  limit: number;
+  offset: number;
+  filters: {
+    type: string | null;
+    since: number | null;
+  };
+  events: KanbanActivityEvent[];
+};
+
+/* ── API functions ──────────────────────────────────────── */
+
+export async function kanbanSummary(): Promise<KanbanSummary> {
+  return request<KanbanSummary>("/api/kanban/summary");
+}
+
+export async function kanbanBoards(): Promise<{ boards: KanbanBoard[] }> {
+  return request<{ boards: KanbanBoard[] }>("/api/kanban/boards");
+}
+
+export async function kanbanBoardDetail(
+  boardId: string,
+  params?: {
+    status?: string;
+    assignee?: string;
+    priority?: number;
+    sort?: string;
+    sort_dir?: string;
+    limit?: number;
+    offset?: number;
+  },
+): Promise<KanbanBoardDetail> {
+  const qs = new URLSearchParams();
+  if (params) {
+    if (params.status) qs.set("status", params.status);
+    if (params.assignee) qs.set("assignee", params.assignee);
+    if (params.priority !== undefined) qs.set("priority", String(params.priority));
+    if (params.sort) qs.set("sort", params.sort);
+    if (params.sort_dir) qs.set("sort_dir", params.sort_dir);
+    if (params.limit !== undefined) qs.set("limit", String(params.limit));
+    if (params.offset !== undefined) qs.set("offset", String(params.offset));
+  }
+  const suffix = qs.toString() ? `?${qs}` : "";
+  return request<KanbanBoardDetail>(`/api/kanban/boards/${boardId}${suffix}`);
+}
+
+export async function kanbanAgents(): Promise<{ agents: KanbanAgent[] }> {
+  return request<{ agents: KanbanAgent[] }>("/api/kanban/agents");
+}
+
+export async function kanbanActivity(params?: {
+  limit?: number;
+  offset?: number;
+  type?: string;
+  since?: number;
+}): Promise<KanbanActivityResponse> {
+  const qs = new URLSearchParams();
+  if (params) {
+    if (params.limit !== undefined) qs.set("limit", String(params.limit));
+    if (params.offset !== undefined) qs.set("offset", String(params.offset));
+    if (params.type) qs.set("type", params.type);
+    if (params.since !== undefined) qs.set("since", String(params.since));
+  }
+  const suffix = qs.toString() ? `?${qs}` : "";
+  return request<KanbanActivityResponse>(`/api/kanban/activity${suffix}`);
+}
