@@ -1017,3 +1017,68 @@ export async function kanbanActivity(params?: {
   const suffix = qs.toString() ? `?${qs}` : "";
   return request<KanbanActivityResponse>(`/api/kanban/activity${suffix}`);
 }
+
+/* ── Kanban Card types ──────────────────────────────────── */
+
+export type KanbanCard = {
+  id: string;
+  title: string;
+  body: string | null;
+  assignee: string | null;
+  status: string;
+  priority: number;
+  created_by: string;
+  created_at: number;
+  started_at: number | null;
+  completed_at: number | null;
+  workspace_kind: string | null;
+  tenant: string | null;
+  result: string | null;
+};
+
+export type KanbanListCardsResponse = {
+  board_id: string;
+  board_name: string;
+  total: number;
+  limit: number;
+  offset: number;
+  filters: {
+    status: string | null;
+    assignee: string | null;
+    priority: number | null;
+    sort: string;
+    sort_dir: string;
+  };
+  tasks: KanbanCard[];
+};
+
+/* ── Kanban Card API functions ──────────────────────────── */
+
+export async function kanbanListCards(params: {
+  status: string;
+  assignee?: string;
+  priority?: number;
+  limit?: number;
+  offset?: number;
+  sort?: string;
+  sort_dir?: string;
+}): Promise<KanbanListCardsResponse> {
+  const qs = new URLSearchParams();
+  qs.set("status", params.status);
+  if (params.assignee) qs.set("assignee", params.assignee);
+  if (params.priority !== undefined) qs.set("priority", String(params.priority));
+  if (params.limit !== undefined) qs.set("limit", String(params.limit));
+  if (params.offset !== undefined) qs.set("offset", String(params.offset));
+  if (params.sort) qs.set("sort", params.sort);
+  if (params.sort_dir) qs.set("sort_dir", params.sort_dir);
+  return request<KanbanListCardsResponse>(`/api/kanban/cards?${qs}`);
+}
+
+export async function kanbanMoveCard(
+  cardId: string,
+  newStatus: string,
+): Promise<KanbanCard> {
+  return request<KanbanCard>(`/api/kanban/cards/${cardId}?status=${encodeURIComponent(newStatus)}`, {
+    method: "PATCH",
+  });
+}
