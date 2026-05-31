@@ -610,7 +610,7 @@ export async function hermesUpdateStatus() {
 }
 
 export async function hermesTriggerUpdate() {
-  return request<{ status?: string; message?: string; output?: string; source?: string }>("/api/hermes_api/update", {
+  return request<{ status?: string; message?: string; error?: string; output?: string; source?: string; exit_code?: number }>("/api/hermes_api/update", {
     method: "POST",
   });
 }

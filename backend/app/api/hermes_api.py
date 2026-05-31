@@ -115,14 +115,31 @@ async def hermes_update_status(request: Request) -> Any:
 async def hermes_update(request: Request) -> Any:
     try:
         code, stdout, stderr = await _run_hermes_command("update", timeout_sec=900)
-    except FileNotFoundError as exc:
-        raise HTTPException(status_code=503, detail="`hermes` command not found on server") from exc
+    except FileNotFoundError:
+        return {
+            "status": "error",
+            "source": "hermes_cli",
+            "message": "`hermes` command not found on server",
+            "error": "`hermes` command not found on server",
+        }
+    except HTTPException as exc:
+        return {
+            "status": "error",
+            "source": "hermes_cli",
+            "message": str(exc.detail),
+            "error": str(exc.detail),
+        }
     output = "\n".join(part.strip() for part in (stdout, stderr) if part.strip())
     if code != 0:
-        raise HTTPException(
-            status_code=502,
-            detail=(output or "`hermes update` failed"),
-        )
+        msg = output or "`hermes update` failed"
+        return {
+            "status": "error",
+            "source": "hermes_cli",
+            "message": msg,
+            "error": msg,
+            "exit_code": code,
+            "output": output,
+        }
     return {
         "status": "ok",
         "source": "hermes_cli",

@@ -1,8 +1,15 @@
 const STORAGE_KEY = "uc-hermes-active-session";
 const TTL_MS = 24 * 60 * 60 * 1000;
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 export type PersistedConversationMode = "stateless" | "session";
+
+export type PersistedMsg = {
+  id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  toolEvents?: string[];
+};
 
 export type HermesPersistedSession = {
   version: number;
@@ -10,6 +17,8 @@ export type HermesPersistedSession = {
   activeRunId: string | null;
   conversationMode: PersistedConversationMode;
   sessionKey: string;
+  conversationKey: string;
+  transcript: PersistedMsg[];
   lastActiveAt: number;
   expiresAt: number;
 };
@@ -24,8 +33,10 @@ export function defaultHermesSession(): HermesPersistedSession {
     version: SCHEMA_VERSION,
     activeSessionId: null,
     activeRunId: null,
-    conversationMode: "session",
+    conversationMode: "stateless",
     sessionKey: "",
+    conversationKey: "",
+    transcript: [],
     lastActiveAt: now,
     expiresAt: now + TTL_MS,
   };

@@ -190,6 +190,9 @@ export default function App() {
     setIsHermesUpdating(true);
     try {
       const result = await hermesTriggerUpdate();
+      if (result.status === "error") {
+        throw new Error(result.error || result.message || "Hermes update failed");
+      }
       const statusRefreshed = await refreshHermesStatus();
       if (!statusRefreshed) {
         setToast("Hermes update triggered. Unable to refresh update status.", "info");
