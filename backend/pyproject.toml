@@ -1,6 +1,6 @@
 [project]
 name = "ultron-controller-backend"
-version = "0.3.3"
+version = "0.3.7"
 description = "FastAPI backend for Ultron Controller"
 readme = "../README.md"
 requires-python = ">=3.11"

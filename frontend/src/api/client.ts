@@ -236,6 +236,71 @@ export async function writePinnedFile(name: string, content: string) {
   });
 }
 
+/* ── Agent Profiles API ─────────────────────────────────── */
+
+export type AgentProfile = {
+  name: string;
+  has_soul: boolean;
+  memories_count: number;
+  role: string | null;
+};
+
+export type AgentMemoryFile = {
+  name: string;
+  size: number;
+  mtime: number;
+  kind: "memory";
+  exists?: boolean;
+};
+
+export async function listAgentProfiles() {
+  return request<{ profiles: AgentProfile[] }>("/api/hermes/profiles");
+}
+
+export async function readAgentSoul(name: string) {
+  return request<{ name: string; content: string; path: string; exists: boolean }>(
+    `/api/hermes/profiles/${encodeURIComponent(name)}/soul`
+  );
+}
+
+export async function writeAgentSoul(name: string, content: string) {
+  return request(`/api/hermes/profiles/${encodeURIComponent(name)}/soul`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content, mode: "replace" }),
+  });
+}
+
+export async function listAgentMemories(name: string) {
+  return request<{ dir: string; files: AgentMemoryFile[] }>(
+    `/api/hermes/profiles/${encodeURIComponent(name)}/memories`
+  );
+}
+
+export async function readAgentMemory(name: string, filename: string) {
+  return request<{ name: string; content: string; path: string }>(
+    `/api/hermes/profiles/${encodeURIComponent(name)}/memories/${encodeURIComponent(filename)}`
+  );
+}
+
+export async function writeAgentMemory(name: string, filename: string, content: string) {
+  return request(
+    `/api/hermes/profiles/${encodeURIComponent(name)}/memories/${encodeURIComponent(filename)}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content, mode: "replace" }),
+    }
+  );
+}
+
+export async function deleteAgentMemory(name: string, filename: string) {
+  return request(
+    `/api/hermes/profiles/${encodeURIComponent(name)}/memories/${encodeURIComponent(filename)}`,
+    { method: "DELETE" }
+  );
+}
+
 export async function listSessions(limit = 100) {
   const response = await request<{ sessions: Array<Record<string, unknown>> }>(
     `/api/sessions?limit=${limit}`
