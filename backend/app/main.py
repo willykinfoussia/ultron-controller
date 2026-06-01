@@ -2,10 +2,13 @@ from contextlib import asynccontextmanager
 from collections.abc import AsyncGenerator
 
 import httpx
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+import logging
+
+logger = logging.getLogger(__name__)
 
 from app.api.health import router as health_router
 from app.api.hermes import router as hermes_router
@@ -45,6 +48,22 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Catch-all: never leak an unhandled exception as HTML."""
+    if isinstance(exc, HTTPException):
+        raise exc
+    logger.exception("Unhandled exception on %s %s", request.method, request.url.path)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "internal_server_error",
+            "detail": "An unexpected error occurred. Check server logs.",
+        },
+    )
+
 
 app.include_router(health_router)
 app.include_router(openviking_router)

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import logging
 import re
 from pathlib import Path
 
 from fastapi import HTTPException
+
+logger = logging.getLogger(__name__)
 
 from app.core.config import Settings
 from app.utils.paths import (
@@ -40,17 +43,24 @@ class HermesProfilesService:
 
     def list_profiles(self, *, search: str | None = None, sort: str = "name", sort_dir: str = "asc", limit: int = 50, offset: int = 0) -> dict:
         profiles = []
-        if self._profiles_dir.exists():
-            for entry in sorted(self._profiles_dir.iterdir(), key=lambda e: e.name):
-                if not entry.is_dir():
-                    continue
-                name = entry.name
-                if search and search.lower() not in name.lower():
-                    continue
-                soul_path = entry / "SOUL.md"
-                memories_dir = entry / "memories"
-                mem_count = 0
-                if memories_dir.is_dir():
+        try:
+            if not self._profiles_dir.exists():
+                return {"profiles": [], "total": 0, "limit": limit, "offset": offset}
+            entries = list(self._profiles_dir.iterdir())
+        except OSError as exc:
+            logger.exception("Cannot iterate profiles directory at %s", self._profiles_dir)
+            raise
+        for entry in sorted(entries, key=lambda e: e.name):
+            if not entry.is_dir():
+                continue
+            name = entry.name
+            if search and search.lower() not in name.lower():
+                continue
+            soul_path = entry / "SOUL.md"
+            memories_dir = entry / "memories"
+            mem_count = 0
+            if memories_dir.is_dir():
+                try:
                     for fp in memories_dir.iterdir():
                         if not fp.is_file():
                             continue
@@ -59,14 +69,17 @@ class HermesProfilesService:
                         except HTTPException:
                             continue
                         mem_count += 1
-                profiles.append(
-                    {
-                        "name": name,
-                        "has_soul": soul_path.is_file(),
-                        "memories_count": mem_count,
-                        "role": self._role_from_soul(soul_path),
-                    }
-                )
+                except OSError as exc:
+                    logger.warning("Cannot iterate memories dir for profile %s: %s", name, exc)
+                    # Continue with partial count rather than failing the whole endpoint
+            profiles.append(
+                {
+                    "name": name,
+                    "has_soul": soul_path.is_file(),
+                    "memories_count": mem_count,
+                    "role": self._role_from_soul(soul_path),
+                }
+            )
 
         # Sort
         reverse = sort_dir == "desc"
@@ -114,7 +127,12 @@ class HermesProfilesService:
         mem_dir = profile_dir / "memories"
         files = []
         if mem_dir.exists():
-            for fp in sorted(mem_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
+            try:
+                entries = list(mem_dir.iterdir())
+            except OSError as exc:
+                logger.exception("Cannot iterate memories directory at %s", mem_dir)
+                raise
+            for fp in entries:
                 if not fp.is_file():
                     continue
                 try:
@@ -123,11 +141,16 @@ class HermesProfilesService:
                     continue
                 if search and search.lower() not in fp.name.lower():
                     continue
+                try:
+                    st = fp.stat()
+                except OSError as exc:
+                    logger.warning("Cannot stat memory file %s: %s", fp, exc)
+                    continue
                 files.append(
                     {
                         "name": fp.name,
-                        "size": fp.stat().st_size,
-                        "mtime": fp.stat().st_mtime,
+                        "size": st.st_size,
+                        "mtime": st.st_mtime,
                         "kind": "memory",
                     }
                 )
@@ -158,7 +181,7 @@ class HermesProfilesService:
             raise HTTPException(status_code=404, detail="Not found")
         return {
             "name": filename,
-            "content": path.read_text(encoding="utf-8"),
+            "content": path.read_text(encoding="utf-8", errors="replace"),
             "path": str(path),
         }
 
