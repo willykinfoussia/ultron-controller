@@ -2,6 +2,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { hermesTriggerUpdate, hermesUpdateStatus } from "./api/client";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Toast, type ToastKind, type ToastState } from "./components/Toast";
 import { HermesPage } from "./pages/HermesPage";
 import { KanbanBoardPage } from "./pages/KanbanPage";
@@ -382,7 +383,9 @@ export default function App() {
             transition={pageTransition}
             className="main-content"
           >
-            {page}
+            <ErrorBoundary key={activeTab}>
+              {page}
+            </ErrorBoundary>
           </motion.main>
         </AnimatePresence>
       </div>
