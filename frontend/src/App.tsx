@@ -19,7 +19,7 @@ type AccentId = "indigo" | "blue" | "cyan" | "emerald" | "rose" | "amber";
 type HermesLedStatus = "up_to_date" | "outdated" | "unknown";
 
 /* ── Sections (sidebar groups) ──────────────────────────── */
-type SectionId = "knowledge" | "kanban" | "system";
+type SectionId = "knowledge" | "activity" | "system";
 
 interface NavItem {
   id: TabId;
@@ -30,7 +30,7 @@ interface NavItem {
 
 const SECTIONS: Array<{ id: SectionId; label: string }> = [
   { id: "knowledge", label: "Knowledge" },
-  { id: "kanban",    label: "Kanban" },
+  { id: "activity",    label: "Activity" },
   { id: "system",    label: "System" },
 ];
 
@@ -39,8 +39,8 @@ const NAV: NavItem[] = [
   { id: "memory",     label: "Hermes Memory", icon: "🧠", section: "knowledge" },
   { id: "sessions",   label: "Sessions",   icon: "🗂️", section: "knowledge" },
   { id: "search",     label: "Search",     icon: "🔍", section: "knowledge" },
-  { id: "hermes",     label: "Hermes",     icon: "🤖", section: "kanban" },
-  { id: "kanban",     label: "Kanban",     icon: "📊", section: "kanban" },
+  { id: "hermes",     label: "Hermes",     icon: "🤖", section: "activity" },
+  { id: "kanban",     label: "Kanban",     icon: "📊", section: "activity" },
   { id: "system",     label: "System",     icon: "🖥️", section: "system" },
   { id: "settings",   label: "Settings",   icon: "⚙️", section: "system" },
 ];
