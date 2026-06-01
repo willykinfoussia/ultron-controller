@@ -252,9 +252,10 @@ export function MemoryPage({ setToast }: MemoryPageProps) {
   const loadProfiles = useCallback(async () => {
     try {
       const result = await listAgentProfiles();
-      setProfiles(result.profiles);
+      setProfiles(result.profiles ?? []);
     } catch (err: unknown) {
       setToast(String(err), "error");
+      setProfiles([]);
     }
   }, []);
 
