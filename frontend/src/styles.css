@@ -2321,6 +2321,12 @@ textarea.editor {
   font-size: var(--text-sm);
 }
 
+.file-tree-item.is-dir > .file-tree-name {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+}
+
 .file-tree-badge {
   display: inline-flex;
   align-items: center;

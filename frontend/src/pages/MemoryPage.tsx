@@ -59,7 +59,7 @@ export function MemoryPage({ setToast }: MemoryPageProps) {
   const [searchQuery, setSearchQuery] = useState("");
 
   // ── Editor mode ───────────────────────────────────────────
-  const [editorMode, setEditorMode] = useState<EditorMode>("edit");
+  const [editorMode, setEditorMode] = useState<EditorMode>("preview");
 
   // ── Dirty state ───────────────────────────────────────────
   const [dirty, setDirty] = useState(false);
@@ -98,13 +98,18 @@ export function MemoryPage({ setToast }: MemoryPageProps) {
   }, [pinnedFiles, searchQuery]);
 
   // ── Dirty state tracking ──────────────────────────────────
+  // Track which tab's content is "original" to avoid false
+  // dirty triggers when switching tabs.
   const currentContent = tab === "files" ? memContent : agentContent;
   const setCurrentContent = tab === "files" ? setMemContent : setAgentContent;
 
   useEffect(() => {
     const original = originalContentRef.current;
-    setDirty(currentContent !== original);
-  }, [currentContent]);
+    // Only mark dirty if content differs from what was loaded
+    // AND we actually have a file selected (original was set by load)
+    const hasSelection = tab === "files" ? memSelected !== null : agentSelected !== null;
+    setDirty(hasSelection && currentContent !== original);
+  }, [currentContent, tab, memSelected, agentSelected]);
 
   // ── Keyboard shortcut: Ctrl+S to save ─────────────────────
   useEffect(() => {
@@ -713,8 +718,8 @@ export function MemoryPage({ setToast }: MemoryPageProps) {
                             <div key={profile.name}>
                               <FileTreeItem
                                 name={profile.name}
-                                icon="📁"
-                                iconOpen="📂"
+                                icon="🤖"
+                                iconOpen="🤖"
                                 isActive={isActiveProfile && !agentSelected?.name}
                                 isDirectory
                                 isOpen={isExpanded}
