@@ -100,7 +100,7 @@ async def kanban_list_cards(
     priority: int | None = Query(None, description="Optional priority filter"),
     sort: str = Query("created_at", description="Sort field"),
     sort_dir: str = Query("asc", description="Sort direction: asc or desc"),
-    limit: int = Query(50, ge=1, le=100, description="Page size (max 100)"),
+    limit: int = Query(50, ge=1, le=200, description="Page size (max 200)"),
     offset: int = Query(0, ge=0, description="Pagination offset"),
 ) -> dict:
     """Return cards filtered by status column for the Kanban board.

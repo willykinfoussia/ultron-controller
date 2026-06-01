@@ -38,13 +38,15 @@ class HermesProfilesService:
 
     # ── public API ─────────────────────────────────────────────────────────
 
-    def list_profiles(self) -> dict:
+    def list_profiles(self, *, search: str | None = None, sort: str = "name", sort_dir: str = "asc", limit: int = 50, offset: int = 0) -> dict:
         profiles = []
         if self._profiles_dir.exists():
             for entry in sorted(self._profiles_dir.iterdir(), key=lambda e: e.name):
                 if not entry.is_dir():
                     continue
                 name = entry.name
+                if search and search.lower() not in name.lower():
+                    continue
                 soul_path = entry / "SOUL.md"
                 memories_dir = entry / "memories"
                 mem_count = 0
@@ -65,7 +67,17 @@ class HermesProfilesService:
                         "role": self._role_from_soul(soul_path),
                     }
                 )
-        return {"profiles": profiles}
+
+        # Sort
+        reverse = sort_dir == "desc"
+        if sort == "memories_count":
+            profiles.sort(key=lambda p: p["memories_count"], reverse=reverse)
+        else:  # name
+            profiles.sort(key=lambda p: p["name"].lower(), reverse=reverse)
+
+        total = len(profiles)
+        paginated = profiles[offset : offset + limit]
+        return {"profiles": paginated, "total": total, "limit": limit, "offset": offset}
 
     def read_soul(self, name: str) -> dict:
         profile_dir = self._profile_dir(name)
