@@ -1082,3 +1082,184 @@ export async function kanbanMoveCard(
     method: "PATCH",
   });
 }
+
+/* ── Task detail ─────────────────────────────────────────── */
+
+export type KanbanTaskDetail = KanbanCard & {
+  workspace_path: string | null;
+  branch_name: string | null;
+  claim_lock: string | null;
+  claim_expires: number | null;
+  consecutive_failures: number;
+  last_failure_error: string | null;
+  max_runtime_seconds: number | null;
+  last_heartbeat_at: number | null;
+  current_run_id: number | null;
+  workflow_template_id: string | null;
+  current_step_key: string | null;
+  model_override: string | null;
+  max_retries: number | null;
+  session_id: string | null;
+  goal_mode: number;
+  goal_max_turns: number | null;
+  runs: Array<{
+    id: number;
+    task_id: string;
+    profile: string | null;
+    step_key: string | null;
+    status: string;
+    claim_lock: string | null;
+    claim_expires: number | null;
+    worker_pid: number | null;
+    max_runtime_seconds: number | null;
+    last_heartbeat_at: number | null;
+    started_at: number;
+    ended_at: number | null;
+    outcome: string | null;
+    summary: string | null;
+    metadata: string | null;
+    error: string | null;
+  }>;
+  comments: Array<{
+    id: number;
+    task_id: string;
+    author: string;
+    body: string;
+    created_at: number;
+  }>;
+  parents: Array<{ id: string; title: string; status: string }>;
+  children: Array<{ id: string; title: string; status: string }>;
+  recent_events: Array<{
+    id: number;
+    task_id: string;
+    run_id: number | null;
+    kind: string;
+    payload: string;
+    created_at: number;
+  }>;
+};
+
+export async function kanbanTaskDetail(taskId: string): Promise<KanbanTaskDetail> {
+  return request<KanbanTaskDetail>(`/api/kanban/tasks/${taskId}`);
+}
+
+/* ── Comments ────────────────────────────────────────────── */
+
+export async function kanbanAddComment(
+  taskId: string,
+  body: string,
+  author?: string,
+): Promise<NonNullable<KanbanTaskDetail["comments"]>[number]> {
+  const qs = new URLSearchParams();
+  qs.set("body", body);
+  if (author) qs.set("author", author);
+  return request<NonNullable<KanbanTaskDetail["comments"]>[number]>(
+    `/api/kanban/tasks/${taskId}/comments?${qs}`,
+    { method: "POST" },
+  );
+}
+
+/* ── Create task ─────────────────────────────────────────── */
+
+export async function kanbanCreateTask(params: {
+  title: string;
+  body?: string;
+  assignee?: string;
+  priority?: number;
+  status?: string;
+  created_by?: string;
+}): Promise<KanbanCard> {
+  const qs = new URLSearchParams();
+  qs.set("title", params.title);
+  if (params.body) qs.set("body", params.body);
+  if (params.assignee) qs.set("assignee", params.assignee);
+  if (params.priority !== undefined) qs.set("priority", String(params.priority));
+  if (params.status) qs.set("status", params.status);
+  if (params.created_by) qs.set("created_by", params.created_by);
+  return request<KanbanCard>(`/api/kanban/tasks?${qs}`, { method: "POST" });
+}
+
+/* ── Search ──────────────────────────────────────────────── */
+
+export type KanbanSearchResponse = {
+  query: string;
+  total: number;
+  limit: number;
+  offset: number;
+  tasks: KanbanCard[];
+};
+
+export async function kanbanSearch(
+  query: string,
+  limit?: number,
+  offset?: number,
+): Promise<KanbanSearchResponse> {
+  const qs = new URLSearchParams();
+  qs.set("q", query);
+  if (limit !== undefined) qs.set("limit", String(limit));
+  if (offset !== undefined) qs.set("offset", String(offset));
+  return request<KanbanSearchResponse>(`/api/kanban/search?${qs}`);
+}
+
+/* ── Update task ─────────────────────────────────────────── */
+
+export async function kanbanUpdateTask(
+  taskId: string,
+  params: {
+    title?: string;
+    body?: string;
+    assignee?: string;
+    priority?: number;
+  },
+): Promise<KanbanCard> {
+  const qs = new URLSearchParams();
+  if (params.title !== undefined) qs.set("title", params.title);
+  if (params.body !== undefined) qs.set("body", params.body);
+  if (params.assignee !== undefined) qs.set("assignee", params.assignee);
+  if (params.priority !== undefined) qs.set("priority", String(params.priority));
+  return request<KanbanCard>(`/api/kanban/tasks/${taskId}?${qs}`, { method: "PATCH" });
+}
+
+/* ── Delete task ─────────────────────────────────────────── */
+
+export async function kanbanDeleteTask(taskId: string): Promise<{ deleted: boolean; task_id: string }> {
+  return request<{ deleted: boolean; task_id: string }>(`/api/kanban/tasks/${taskId}`, { method: "DELETE" });
+}
+
+/* ── Link / Unlink tasks ─────────────────────────────────── */
+
+export async function kanbanLinkTasks(parentId: string, childId: string): Promise<{ parent_id: string; child_id: string; linked: boolean }> {
+  return request(`/api/kanban/tasks/${parentId}/link/${childId}`, { method: "POST" });
+}
+
+export async function kanbanUnlinkTasks(parentId: string, childId: string): Promise<{ parent_id: string; child_id: string; unlinked: boolean }> {
+  return request(`/api/kanban/tasks/${parentId}/link/${childId}`, { method: "DELETE" });
+}
+
+/* ── Block / Unblock tasks ───────────────────────────────── */
+
+export async function kanbanBlockTask(taskId: string, reason: string): Promise<KanbanCard> {
+  const qs = new URLSearchParams();
+  qs.set("reason", reason);
+  return request<KanbanCard>(`/api/kanban/tasks/${taskId}/block?${qs}`, { method: "POST" });
+}
+
+export async function kanbanUnblockTask(taskId: string, status?: string): Promise<KanbanCard> {
+  const qs = new URLSearchParams();
+  if (status) qs.set("status", status);
+  return request<KanbanCard>(`/api/kanban/tasks/${taskId}/unblock?${qs}`, { method: "POST" });
+}
+
+/* ── Reclaim task ────────────────────────────────────────── */
+
+export async function kanbanReclaimTask(taskId: string): Promise<KanbanCard> {
+  return request<KanbanCard>(`/api/kanban/tasks/${taskId}/reclaim`, { method: "POST" });
+}
+
+/* ── Assign task ─────────────────────────────────────────── */
+
+export async function kanbanAssignTask(taskId: string, assignee: string): Promise<KanbanCard> {
+  const qs = new URLSearchParams();
+  qs.set("assignee", assignee);
+  return request<KanbanCard>(`/api/kanban/tasks/${taskId}/assign?${qs}`, { method: "POST" });
+}

@@ -353,3 +353,134 @@ class KanbanReader:
             },
             "events": events,
         }
+
+    def get_task_detail(self, task_id: str) -> dict[str, Any]:
+        """Full task detail including runs, comments, and linked tasks."""
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT
+                    id, title, body, assignee, status, priority,
+                    created_by, created_at, started_at, completed_at,
+                    workspace_kind, workspace_path, branch_name,
+                    claim_lock, claim_expires, tenant, result,
+                    consecutive_failures, last_failure_error,
+                    max_runtime_seconds, last_heartbeat_at,
+                    current_run_id, workflow_template_id, current_step_key,
+                    model_override, max_retries, session_id,
+                    goal_mode, goal_max_turns
+                FROM tasks WHERE id = ?
+                """,
+                (task_id,),
+            ).fetchone()
+
+            if not row:
+                raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+
+            task = dict(r) if (r := row) else {}
+
+            # Fetch runs
+            run_rows = conn.execute(
+                """
+                SELECT id, task_id, profile, step_key, status,
+                       claim_lock, claim_expires, worker_pid,
+                       max_runtime_seconds, last_heartbeat_at,
+                       started_at, ended_at, outcome, summary,
+                       metadata, error
+                FROM task_runs
+                WHERE task_id = ?
+                ORDER BY started_at DESC
+                """,
+                (task_id,),
+            ).fetchall()
+            task["runs"] = [dict(r) for r in run_rows]
+
+            # Fetch comments
+            comment_rows = conn.execute(
+                """
+                SELECT id, task_id, author, body, created_at
+                FROM task_comments
+                WHERE task_id = ?
+                ORDER BY created_at ASC
+                """,
+                (task_id,),
+            ).fetchall()
+            task["comments"] = [dict(c) for c in comment_rows]
+
+            # Fetch parent links
+            parent_rows = conn.execute(
+                """
+                SELECT t.id, t.title, t.status
+                FROM task_links tl
+                JOIN tasks t ON t.id = tl.parent_id
+                WHERE tl.child_id = ?
+                """,
+                (task_id,),
+            ).fetchall()
+            task["parents"] = [dict(p) for p in parent_rows]
+
+            # Fetch child links
+            child_rows = conn.execute(
+                """
+                SELECT t.id, t.title, t.status
+                FROM task_links tl
+                JOIN tasks t ON t.id = tl.child_id
+                WHERE tl.parent_id = ?
+                """,
+                (task_id,),
+            ).fetchall()
+            task["children"] = [dict(c) for c in child_rows]
+
+            # Fetch recent events (last 20)
+            event_rows = conn.execute(
+                """
+                SELECT id, task_id, run_id, kind, payload, created_at
+                FROM task_events
+                WHERE task_id = ?
+                ORDER BY created_at DESC
+                LIMIT 20
+                """,
+                (task_id,),
+            ).fetchall()
+            task["recent_events"] = [dict(e) for e in event_rows]
+
+        return task
+
+    def search_tasks(
+        self,
+        query: str,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> dict[str, Any]:
+        """Search tasks by title or body content."""
+        search_term = f"%{query}%"
+        with self._connect() as conn:
+            total = conn.execute(
+                "SELECT COUNT(*) FROM tasks WHERE title LIKE ? OR body LIKE ?",
+                (search_term, search_term),
+            ).fetchone()[0]
+
+            rows = conn.execute(
+                """
+                SELECT
+                    id, title, body, assignee, status, priority,
+                    created_by, created_at, started_at, completed_at,
+                    workspace_kind, tenant, result
+                FROM tasks
+                WHERE title LIKE ? OR body LIKE ?
+                ORDER BY
+                    CASE WHEN title LIKE ? THEN 0 ELSE 1 END,
+                    created_at DESC
+                LIMIT ? OFFSET ?
+                """,
+                (search_term, search_term, search_term, limit, offset),
+            ).fetchall()
+
+        tasks = [dict(r) for r in rows]
+        return {
+            "query": query,
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+            "tasks": tasks,
+        }
