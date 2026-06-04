@@ -4,7 +4,7 @@ from collections.abc import AsyncGenerator
 import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 import logging
 
@@ -93,11 +93,5 @@ if frontend_dist.exists():
 else:
 
     @app.get("/")
-    async def root() -> JSONResponse:
-        return JSONResponse(
-            status_code=200,
-            content={
-                "name": "Ultron Controller API",
-                "message": "Frontend build not found. Build frontend to serve SPA.",
-            },
-        )
+    async def root() -> RedirectResponse:
+        return RedirectResponse(url="/hermes")
