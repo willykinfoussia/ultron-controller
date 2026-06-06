@@ -1,5 +1,5 @@
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { motion } from "framer-motion";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { hermesTriggerUpdate, hermesUpdateStatus } from "./api/client";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -160,14 +160,6 @@ export default function App() {
   /* ── Navigation ── */
   const [activeTab, setActiveTab] = useState<TabId>("hermes");
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const dirRef = useRef<1 | -1>(1);
-
-  function handleTabChange(id: TabId) {
-    const cur  = NAV.findIndex((n) => n.id === activeTab);
-    const next = NAV.findIndex((n) => n.id === id);
-    dirRef.current = next >= cur ? 1 : -1;
-    setActiveTab(id);
-  }
 
   /* ── Toast ── */
   const [toast, setToastState] = useState<ToastState>(null);
@@ -216,7 +208,7 @@ export default function App() {
   }, [toast]);
 
   /* ── Page render ── */
-  const page = useMemo(() => {
+  function renderPage() {
     const props = { setToast };
     if (activeTab === "openviking") return <OpenVikingPage {...props} />;
     if (activeTab === "memory")     return <MemoryPage {...props} />;
@@ -235,22 +227,7 @@ export default function App() {
       />
     );
     return <SearchPage {...props} />;
-  }, [activeTab, setToast, theme, accent, appVersion]);
-
-  /* ── Reduced motion ── */
-  const prefersReduced = useReducedMotion();
-
-  const pageVariants = prefersReduced
-    ? undefined
-    : {
-        initial: { opacity: 0, x: dirRef.current * 20 },
-        animate: { opacity: 1, x: 0 },
-        exit:    { opacity: 0, x: dirRef.current * -14 },
-      };
-
-  const pageTransition = prefersReduced
-    ? { duration: 0 }
-    : { duration: 0.18, ease: [0, 0, 0.2, 1] };
+  }
 
   /* ── Sidebar sections ── */
   const navBySection = SECTIONS.map((sec) => ({
@@ -292,7 +269,7 @@ export default function App() {
                   <button
                     key={item.id}
                     className={`sidebar-link ${isActive ? "active" : ""}`}
-                    onClick={() => handleTabChange(item.id)}
+                    onClick={() => setActiveTab(item.id)}
                     aria-current={isActive ? "page" : undefined}
                     title={!sidebarOpen ? item.label : undefined}
                   >
@@ -339,13 +316,13 @@ export default function App() {
           <div className="topbar-nav">
             <button
               className={`topbar-nav-link ${activeTab === "memory" ? "active" : ""}`}
-              onClick={() => handleTabChange("memory")}
+              onClick={() => setActiveTab("memory")}
             >
               Hermes Memory
             </button>
             <button
               className={`topbar-nav-link ${activeTab === "hermes" ? "active" : ""}`}
-              onClick={() => handleTabChange("hermes")}
+              onClick={() => setActiveTab("hermes")}
             >
               Hermes
             </button>
@@ -371,23 +348,12 @@ export default function App() {
           </div>
         </header>
 
-        {/* ── Page (animated) ── */}
-        <AnimatePresence mode="popLayout" initial={false}>
-          <motion.main
-            key={activeTab}
-            role="main"
-            variants={pageVariants}
-            initial={prefersReduced ? false : "initial"}
-            animate={prefersReduced ? undefined : "animate"}
-            exit={prefersReduced ? undefined : "exit"}
-            transition={pageTransition}
-            className="main-content"
-          >
-            <ErrorBoundary key={activeTab}>
-              {page}
-            </ErrorBoundary>
-          </motion.main>
-        </AnimatePresence>
+        {/* ── Page ── */}
+        <main role="main" className="main-content">
+          <ErrorBoundary key={activeTab}>
+            {renderPage()}
+          </ErrorBoundary>
+        </main>
       </div>
 
       <Toast toast={toast} />
