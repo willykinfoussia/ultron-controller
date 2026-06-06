@@ -372,7 +372,7 @@ export default function App() {
         </header>
 
         {/* ── Page (animated) ── */}
-        <AnimatePresence mode="wait" initial={false}>
+        <AnimatePresence mode="popLayout" initial={false}>
           <motion.main
             key={activeTab}
             role="main"
