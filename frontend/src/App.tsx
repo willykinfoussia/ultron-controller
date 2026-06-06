@@ -158,7 +158,7 @@ export default function App() {
   }
 
   /* ── Navigation ── */
-  const [activeTab, setActiveTab] = useState<TabId>("openviking");
+  const [activeTab, setActiveTab] = useState<TabId>("hermes");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const dirRef = useRef<1 | -1>(1);
 
