@@ -7,6 +7,7 @@ import {
 } from "react";
 import {
   type ChatStreamChunk,
+  type FileAttachment,
   type HermesAgentSession,
   type HermesCapabilities,
   type HermesChatMessage,
@@ -14,6 +15,8 @@ import {
   type HermesRunStatus,
   type HermesSkill,
   type HermesToolset,
+  fileCategory,
+  getHermesFolder,
   hermesApiCapabilities,
   hermesApiHealth,
   hermesApiHealthDetailed,
@@ -37,6 +40,7 @@ import {
   hermesRunJob,
   hermesSessionChatStream,
   hermesStopRun,
+  uploadToDrive,
   type RunStreamEvent,
   type SessionMessage,
 } from "../api/client";
@@ -46,6 +50,7 @@ import {
   clearHermesSessionState,
   readHermesSessionState,
   writeHermesSessionState,
+  type PersistedAttachment,
 } from "../state/hermesSessionStore";
 
 /* ── Types ──────────────────────────────────────────────── */
@@ -58,6 +63,7 @@ type LocalMsg = {
   content: string;
   streaming?: boolean;
   toolEvents?: string[];
+  attachments?: FileAttachment[];
 };
 
 type Props = { setToast: (msg: string, kind?: ToastKind) => void };
@@ -95,6 +101,30 @@ function formatTtl(ms: number) {
   return `${minutes}m`;
 }
 
+const CATEGORY_ICONS: Record<string, string> = {
+  text: "📄",
+  spreadsheet: "📊",
+  document: "📝",
+  presentation: "📽",
+  image: "🖼",
+  archive: "📦",
+  pdf: "📋",
+  other: "📎",
+};
+
+function categoryIcon(cat: string): string {
+  return CATEGORY_ICONS[cat] ?? "📎";
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
+const ACCEPTED_EXTENSIONS = ".xlsx,.xls,.docx,.doc,.pptx,.ppt,.txt,.csv,.pdf,.png,.jpg,.jpeg,.gif,.zip";
+
 /* ═══════════════════════════════════════════════════════════
    CHAT VIEW
    ═══════════════════════════════════════════════════════════ */
@@ -107,9 +137,13 @@ function ChatView({ setToast }: Props) {
   const [sessionKey, setSessionKey] = useState("");
   const [showRestoredBadge, setShowRestoredBadge] = useState(false);
   const [ttlRemainingMs, setTtlRemainingMs] = useState<number | null>(null);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [driveFolderLink, setDriveFolderLink] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   /* ── Auto-scroll ─────────────────────────────────────────── */
   useEffect(() => {
@@ -134,12 +168,22 @@ function ChatView({ setToast }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /* ── Mount: fetch Drive folder link ──────────────────────── */
+  useEffect(() => {
+    getHermesFolder()
+      .then((folder) => setDriveFolderLink(folder.folder_link))
+      .catch(() => { /* folder link not available — non-critical */ });
+  }, []);
+
   /* ── Persist transcript whenever messages change (non-streaming) ── */
   useEffect(() => {
     if (streaming) return;
     const transcript = messages
       .filter((m) => !m.streaming)
-      .map(({ id, role, content, toolEvents }) => ({ id, role, content, toolEvents }));
+      .map(({ id, role, content, toolEvents, attachments }) => ({
+        id, role, content, toolEvents,
+        attachments: attachments as PersistedAttachment[] | undefined,
+      }));
     writeHermesSessionState({ transcript });
     const persisted = readHermesSessionState();
     setTtlRemainingMs(Math.max(0, persisted.expiresAt - Date.now()));
@@ -189,11 +233,44 @@ function ChatView({ setToast }: Props) {
 
   async function send() {
     const text = input.trim();
-    if (!text || streaming) return;
+    const hasFiles = pendingFiles.length > 0;
+    if ((!text && !hasFiles) || streaming || uploading) return;
     setInput("");
     if (textareaRef.current) textareaRef.current.style.height = "auto";
 
-    const userMsg: LocalMsg = { id: uid(), role: "user", content: text };
+    // Upload files first if any
+    let attachments: FileAttachment[] = [];
+    if (hasFiles) {
+      setUploading(true);
+      const filesToUpload = [...pendingFiles];
+      setPendingFiles([]);
+      const results: FileAttachment[] = [];
+      for (const file of filesToUpload) {
+        try {
+          const res = await uploadToDrive(file);
+          results.push({
+            id: res.drive_id,
+            name: res.file_name,
+            type: fileCategory(res.mime_type, res.file_name),
+            size: file.size,
+            mimeType: res.mime_type,
+            driveLink: res.drive_link,
+            driveId: res.drive_id,
+          });
+        } catch (err) {
+          setToast(`Upload failed for ${file.name}: ${err}`, "error");
+        }
+      }
+      attachments = results;
+      setUploading(false);
+    }
+
+    const userMsg: LocalMsg = {
+      id: uid(),
+      role: "user",
+      content: text || (attachments.length > 0 ? `📎 ${attachments.length} file${attachments.length > 1 ? "s" : ""} attached` : ""),
+      ...(attachments.length > 0 ? { attachments } : {}),
+    };
     const assistantId = uid();
     const assistantMsg: LocalMsg = {
       id: assistantId,
@@ -212,7 +289,7 @@ function ChatView({ setToast }: Props) {
     try {
       const history: HermesChatMessage[] = [
         ...messages.map((m) => ({ role: m.role, content: m.content })),
-        { role: "user", content: text },
+        { role: "user", content: userMsg.content },
       ];
       const convKey = sessionKey || readHermesSessionState().conversationKey || undefined;
       for await (const chunk of hermesChatStream(history, controller.signal, convKey)) {
@@ -267,7 +344,29 @@ function ChatView({ setToast }: Props) {
 
   function clearChat() {
     setMessages([]);
+    setPendingFiles([]);
     clearHermesSessionState();
+  }
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files) return;
+    const newFiles: File[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      if (f.size > MAX_FILE_SIZE) {
+        setToast(`${f.name} exceeds 25 MB limit`, "error");
+        continue;
+      }
+      newFiles.push(f);
+    }
+    setPendingFiles((prev) => [...prev, ...newFiles]);
+    // Reset input so re-selecting the same file fires onChange
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  function removePendingFile(index: number) {
+    setPendingFiles((prev) => prev.filter((_, i) => i !== index));
   }
 
   return (
@@ -310,6 +409,17 @@ function ChatView({ setToast }: Props) {
             <button onClick={clearChat} className="btn-ghost" style={{ marginLeft: "auto" }}>
               Clear
             </button>
+            {driveFolderLink && (
+              <a
+                href={driveFolderLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-ghost drive-folder-btn"
+                title="Open Drive folder"
+              >
+                📁 Drive
+              </a>
+            )}
           </div>
         </div>
       </div>
@@ -365,6 +475,29 @@ function ChatView({ setToast }: Props) {
                     ))}
                   </details>
                 )}
+                {(msg.attachments?.length ?? 0) > 0 && (
+                  <div className="message-attachments">
+                    {msg.attachments!.map((att) => (
+                      <div key={att.id} className="message-attachment">
+                        <span style={{ fontSize: 18 }}>{categoryIcon(att.type)}</span>
+                        <a
+                          href={att.driveLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="message-attachment-link"
+                        >
+                          {att.name}
+                        </a>
+                        <span style={{ fontSize: "var(--text-xs)", color: "var(--text-3)" }}>
+                          {formatFileSize(att.size)}
+                        </span>
+                        <span className="badge" style={{ fontSize: 10 }}>
+                          Drive
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </motion.div>
           ))}
@@ -374,40 +507,82 @@ function ChatView({ setToast }: Props) {
 
       {/* Input area */}
       <div className="card" style={{ flexShrink: 0 }}>
-        <div className="card-body" style={{ padding: "var(--sp-2) var(--sp-3)", display: "flex", gap: "var(--sp-2)", alignItems: "flex-end" }}>
-          <textarea
-            ref={textareaRef}
-            value={input}
-            onChange={adjustHeight}
-            onKeyDown={handleKey}
-            placeholder="Message Hermes… (Ctrl+Enter to send)"
-            disabled={streaming}
-            rows={1}
-            style={{
-              flex: 1,
-              resize: "none",
-              minHeight: 36,
-              maxHeight: 200,
-              lineHeight: 1.5,
-              fontFamily: "var(--font)",
-              fontSize: "var(--text-md)",
-              overflowY: "auto",
-            }}
-          />
-          {streaming ? (
-            <button className="danger" onClick={stop} style={{ flexShrink: 0 }}>
-              Stop
-            </button>
-          ) : (
-            <button
-              className="primary"
-              onClick={() => send().catch(() => undefined)}
-              disabled={!input.trim()}
-              style={{ flexShrink: 0 }}
-            >
-              Send
-            </button>
+        <div className="card-body" style={{ padding: "var(--sp-2) var(--sp-3)", display: "flex", flexDirection: "column", gap: 0 }}>
+          {/* Pending files preview bar */}
+          {pendingFiles.length > 0 && (
+            <div className="chat-attach-bar">
+              {pendingFiles.map((file, i) => (
+                <div key={`${file.name}-${i}`} className="chat-attach-item">
+                  <span>{categoryIcon(fileCategory(file.type, file.name))}</span>
+                  <span className="chat-attach-name">{file.name}</span>
+                  <span className="chat-attach-size">{formatFileSize(file.size)}</span>
+                  <button
+                    className="chat-attach-remove"
+                    onClick={() => removePendingFile(i)}
+                    title="Remove file"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
           )}
+          <div style={{ display: "flex", gap: "var(--sp-2)", alignItems: "flex-end" }}>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={ACCEPTED_EXTENSIONS}
+              multiple
+              onChange={handleFileSelect}
+              style={{ display: "none" }}
+            />
+            <button
+              className="btn-ghost"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={streaming || uploading}
+              title="Attach files"
+              style={{ flexShrink: 0, padding: "4px 8px", fontSize: 18, lineHeight: 1 }}
+            >
+              📎
+            </button>
+            <textarea
+              ref={textareaRef}
+              value={input}
+              onChange={adjustHeight}
+              onKeyDown={handleKey}
+              placeholder="Message Hermes… (Ctrl+Enter to send)"
+              disabled={streaming || uploading}
+              rows={1}
+              style={{
+                flex: 1,
+                resize: "none",
+                minHeight: 36,
+                maxHeight: 200,
+                lineHeight: 1.5,
+                fontFamily: "var(--font)",
+                fontSize: "var(--text-md)",
+                overflowY: "auto",
+              }}
+            />
+            {uploading ? (
+              <button className="primary" disabled style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: "var(--sp-1)" }}>
+                <Spinner size="sm" /> Uploading
+              </button>
+            ) : streaming ? (
+              <button className="danger" onClick={stop} style={{ flexShrink: 0 }}>
+                Stop
+              </button>
+            ) : (
+              <button
+                className="primary"
+                onClick={() => send().catch(() => undefined)}
+                disabled={!input.trim() && pendingFiles.length === 0}
+                style={{ flexShrink: 0 }}
+              >
+                Send
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

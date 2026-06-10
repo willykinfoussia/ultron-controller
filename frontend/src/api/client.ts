@@ -1263,3 +1263,164 @@ export async function kanbanAssignTask(taskId: string, assignee: string): Promis
   qs.set("assignee", assignee);
   return request<KanbanCard>(`/api/kanban/tasks/${taskId}/assign?${qs}`, { method: "POST" });
 }
+
+/* ═══════════════════════════════════════════════════════════
+   GWS (Google Workspace) API — file upload + Drive helpers
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Types ──────────────────────────────────────────────── */
+
+export type GwsUploadResult = {
+  file_name: string;
+  drive_link: string;
+  drive_id: string;
+  mime_type: string;
+};
+
+export type GwsHermesFolder = {
+  folder_id: string;
+  folder_link: string;
+};
+
+export type FileAttachment = {
+  id: string;
+  name: string;
+  type:
+    | "spreadsheet"
+    | "document"
+    | "presentation"
+    | "image"
+    | "archive"
+    | "text"
+    | "pdf"
+    | "other";
+  size: number;
+  mimeType: string;
+  driveLink: string;
+  driveId: string;
+};
+
+/* ── fileCategory helper ─────────────────────────────────── */
+
+/**
+ * Classifies a file into a category based on its MIME type and filename extension.
+ * MIME type is checked first (more reliable), then falls back to extension matching.
+ */
+export function fileCategory(
+  mimeType: string,
+  fileName: string,
+): FileAttachment["type"] {
+  const lowerMime = mimeType.toLowerCase();
+  const ext = fileName.includes(".")
+    ? fileName.slice(fileName.lastIndexOf(".")).toLowerCase()
+    : "";
+
+  // Check MIME type first — most authoritative
+  if (lowerMime === "application/pdf") return "pdf";
+  if (lowerMime.startsWith("image/")) return "image";
+  if (
+    lowerMime.includes("spreadsheet") ||
+    lowerMime === "application/vnd.ms-excel" ||
+    lowerMime === "text/csv"
+  )
+    return "spreadsheet";
+  if (
+    lowerMime.includes("document") ||
+    lowerMime.includes("wordprocessing") ||
+    lowerMime === "application/msword" ||
+    lowerMime === "application/rtf"
+  )
+    return "document";
+  if (
+    lowerMime.includes("presentation") ||
+    lowerMime === "application/vnd.ms-powerpoint"
+  )
+    return "presentation";
+  if (
+    lowerMime.includes("zip") ||
+    lowerMime.includes("tar") ||
+    lowerMime.includes("compressed") ||
+    lowerMime.includes("archive") ||
+    lowerMime === "application/x-rar-compressed" ||
+    lowerMime === "application/x-7z-compressed"
+  )
+    return "archive";
+  if (
+    lowerMime.startsWith("text/") ||
+    lowerMime === "application/json" ||
+    lowerMime === "application/xml" ||
+    lowerMime === "application/javascript"
+  )
+    return "text";
+
+  // Fall back to file extension
+  const extMap: Record<string, FileAttachment["type"]> = {
+    ".xlsx": "spreadsheet",
+    ".xls": "spreadsheet",
+    ".csv": "spreadsheet",
+    ".ods": "spreadsheet",
+    ".docx": "document",
+    ".doc": "document",
+    ".odt": "document",
+    ".rtf": "document",
+    ".pptx": "presentation",
+    ".ppt": "presentation",
+    ".odp": "presentation",
+    ".pdf": "pdf",
+    ".zip": "archive",
+    ".tar": "archive",
+    ".gz": "archive",
+    ".rar": "archive",
+    ".7z": "archive",
+    ".bz2": "archive",
+    ".txt": "text",
+    ".md": "text",
+    ".log": "text",
+    ".json": "text",
+    ".xml": "text",
+    ".yaml": "text",
+    ".yml": "text",
+    ".js": "text",
+    ".ts": "text",
+    ".py": "text",
+    ".sh": "text",
+    ".css": "text",
+    ".html": "text",
+    ".svg": "image",
+    ".png": "image",
+    ".jpg": "image",
+    ".jpeg": "image",
+    ".gif": "image",
+    ".webp": "image",
+    ".bmp": "image",
+    ".ico": "image",
+  };
+
+  if (ext in extMap) return extMap[ext];
+
+  return "other";
+}
+
+/* ── API functions ──────────────────────────────────────── */
+
+/**
+ * Upload a file to Google Drive via the backend GWS endpoint.
+ * Sends the file as FormData — the browser sets the multipart
+ * Content-Type header with the correct boundary automatically.
+ */
+export async function uploadToDrive(file: File): Promise<GwsUploadResult> {
+  const formData = new FormData();
+  formData.append("file", file);
+  return request<GwsUploadResult>("/api/gws/upload", {
+    method: "POST",
+    body: formData,
+    // No Content-Type header — browser sets multipart/form-data with boundary
+  });
+}
+
+/**
+ * Retrieve the Hermes folder link and ID from Google Drive.
+ */
+export async function getHermesFolder(): Promise<GwsHermesFolder> {
+  return request<GwsHermesFolder>("/api/gws/hermes-folder");
+}

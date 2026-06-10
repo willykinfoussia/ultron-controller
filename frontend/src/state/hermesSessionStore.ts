@@ -9,6 +9,17 @@ export type PersistedMsg = {
   role: "user" | "assistant" | "system";
   content: string;
   toolEvents?: string[];
+  attachments?: PersistedAttachment[];
+};
+
+export type PersistedAttachment = {
+  id: string;
+  name: string;
+  type: "spreadsheet" | "document" | "presentation" | "image" | "archive" | "text" | "pdf" | "other";
+  size: number;
+  mimeType: string;
+  driveLink: string;
+  driveId: string;
 };
 
 export type HermesPersistedSession = {
