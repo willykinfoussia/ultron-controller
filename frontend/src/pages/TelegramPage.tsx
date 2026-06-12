@@ -7,6 +7,8 @@ import {
 } from "react";
 
 import {
+  getHermesFolder,
+  telegramMediaDownloadUrl,
   telegramMessages,
   telegramSend,
   telegramStatus,
@@ -14,11 +16,15 @@ import {
   type TelegramStatus,
 } from "../api/client";
 import { Spinner } from "../components/Spinner";
+import { TelegramIcon } from "../components/TelegramIcon";
 import type { ToastKind } from "../components/Toast";
 
 type Props = { setToast: (msg: string, kind?: ToastKind) => void };
 
 const POLL_MS = 3000;
+const SCROLL_THRESHOLD = 80;
+const ACCEPTED_EXTENSIONS =
+  ".xlsx,.xls,.docx,.doc,.pptx,.ppt,.txt,.csv,.pdf,.png,.jpg,.jpeg,.gif,.webp,.zip,.mp3,.ogg,.wav,.m4a,.mp4,.webm";
 
 function formatTimestamp(ts: string | null | undefined) {
   if (!ts) return null;
@@ -38,6 +44,44 @@ function roleClass(role: string): string {
   if (role === "user") return "user";
   if (role === "assistant") return "assistant";
   return "system";
+}
+
+function isNearBottom(el: HTMLElement, threshold = SCROLL_THRESHOLD): boolean {
+  return el.scrollHeight - el.scrollTop - el.clientHeight <= threshold;
+}
+
+function lastMessageId(msgs: TelegramMessage[]): number | null {
+  if (!msgs.length) return null;
+  return msgs[msgs.length - 1].id;
+}
+
+function awaitingReply(messages: TelegramMessage[]): boolean {
+  if (!messages.length) return false;
+  const last = messages[messages.length - 1];
+  return last.role === "user";
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function mediaIcon(mediaType: string | null | undefined): string {
+  if (mediaType === "photo") return "🖼";
+  if (mediaType === "video") return "🎬";
+  if (mediaType === "voice" || mediaType === "audio") return "🎵";
+  return "📎";
+}
+
+function mergeSentMessage(messages: TelegramMessage[], sent: TelegramMessage): TelegramMessage[] {
+  const idx = messages.findIndex((m) => m.id === sent.id);
+  if (idx >= 0) {
+    const next = [...messages];
+    next[idx] = sent;
+    return next;
+  }
+  return [...messages, sent];
 }
 
 function SetupHelp({ status }: { status: TelegramStatus | null }) {
@@ -93,11 +137,37 @@ export function TelegramPage({ setToast }: Props) {
   const [status, setStatus] = useState<TelegramStatus | null>(null);
   const [statusLoading, setStatusLoading] = useState(true);
   const [messages, setMessages] = useState<TelegramMessage[]>([]);
-  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [messagesInitialLoad, setMessagesInitialLoad] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [input, setInput] = useState("");
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [sending, setSending] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const [driveFolderLink, setDriveFolderLink] = useState<string | null>(null);
+  const [pinnedToBottom, setPinnedToBottom] = useState(true);
+  const messagesScrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const isInitialLoadRef = useRef(true);
+  const lastSeenMessageIdRef = useRef<number | null>(null);
+  const scrollAfterSendRef = useRef(false);
+  const initialScrollDoneRef = useRef(false);
+
+  const scrollToBottom = useCallback(
+    (force = false) => {
+      const el = messagesScrollRef.current;
+      if (!el) return;
+      if (!force && !isNearBottom(el)) return;
+
+      const target = el.scrollHeight;
+      if (prefersReduced || !force) {
+        el.scrollTop = target;
+        return;
+      }
+
+      el.scrollTo({ top: target, behavior: "smooth" });
+    },
+    [prefersReduced],
+  );
 
   const refreshStatus = useCallback(async () => {
     try {
@@ -112,67 +182,144 @@ export function TelegramPage({ setToast }: Props) {
     }
   }, [setToast]);
 
-  const refreshMessages = useCallback(async () => {
-    if (!status?.connected) return;
-    setMessagesLoading(true);
-    try {
-      const data = await telegramMessages(80);
-      setMessages(data.messages);
-    } catch (err) {
-      setToast(String(err), "error");
-    } finally {
-      setMessagesLoading(false);
-    }
-  }, [setToast, status?.connected]);
+  const refreshMessages = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      if (!status?.connected) return;
+      const silent = opts?.silent ?? !isInitialLoadRef.current;
+      if (silent) {
+        setRefreshing(true);
+      }
+      try {
+        const data = await telegramMessages(80);
+        const prevId = lastSeenMessageIdRef.current;
+        const nextId = lastMessageId(data.messages);
+        const hasNewMessage = nextId !== null && nextId !== prevId;
+
+        setMessages(data.messages);
+        lastSeenMessageIdRef.current = nextId;
+
+        if (!initialScrollDoneRef.current && data.messages.length > 0) {
+          initialScrollDoneRef.current = true;
+          requestAnimationFrame(() => scrollToBottom(true));
+        } else if (scrollAfterSendRef.current) {
+          scrollAfterSendRef.current = false;
+          requestAnimationFrame(() => scrollToBottom(true));
+        } else if (hasNewMessage) {
+          requestAnimationFrame(() => scrollToBottom(false));
+        }
+      } catch (err) {
+        setToast(String(err), "error");
+      } finally {
+        isInitialLoadRef.current = false;
+        setMessagesInitialLoad(false);
+        if (silent) {
+          setRefreshing(false);
+        }
+      }
+    },
+    [setToast, status?.connected, scrollToBottom],
+  );
 
   useEffect(() => {
     refreshStatus().catch(() => undefined);
   }, [refreshStatus]);
 
   useEffect(() => {
-    if (!status?.connected) return;
-    refreshMessages().catch(() => undefined);
-  }, [status?.connected, refreshMessages]);
+    getHermesFolder()
+      .then((folder) => setDriveFolderLink(folder.folder_link))
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    if (!status?.connected) return;
+    isInitialLoadRef.current = true;
+    setMessagesInitialLoad(true);
+    initialScrollDoneRef.current = false;
+    lastSeenMessageIdRef.current = null;
+    refreshMessages({ silent: false }).catch(() => undefined);
+  }, [status?.connected, refreshMessages]);
 
   useEffect(() => {
     if (!status?.connected) return;
     const id = window.setInterval(() => {
-      refreshMessages().catch(() => undefined);
+      refreshMessages({ silent: true }).catch(() => undefined);
     }, POLL_MS);
     return () => window.clearInterval(id);
   }, [refreshMessages, status?.connected]);
 
+  useEffect(() => {
+    if (awaitingReply(messages) && pinnedToBottom) {
+      requestAnimationFrame(() => scrollToBottom(false));
+    }
+  }, [messages, pinnedToBottom, scrollToBottom]);
+
+  function handleScroll() {
+    const el = messagesScrollRef.current;
+    if (!el) return;
+    setPinnedToBottom(isNearBottom(el));
+  }
+
   async function send() {
     const text = input.trim();
-    if (!text || sending || !status?.connected) return;
+    const file = pendingFile;
+    if ((!text && !file) || sending || !status?.connected) return;
     setInput("");
+    setPendingFile(null);
     if (textareaRef.current) textareaRef.current.style.height = "auto";
+    if (fileInputRef.current) fileInputRef.current.value = "";
     setSending(true);
+    scrollAfterSendRef.current = true;
+    setPinnedToBottom(true);
     try {
-      await telegramSend(text);
-      await refreshMessages();
+      const sent = await telegramSend(text, file ?? undefined);
+      setMessages((prev) => {
+        const next = mergeSentMessage(prev, sent);
+        lastSeenMessageIdRef.current = lastMessageId(next);
+        return next;
+      });
+      requestAnimationFrame(() => scrollToBottom(true));
+      refreshMessages({ silent: true }).catch(() => undefined);
     } catch (err) {
+      scrollAfterSendRef.current = false;
       setToast(String(err), "error");
     } finally {
       setSending(false);
     }
   }
 
-  function onKeyDown(ev: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (ev.key === "Enter" && !ev.shiftKey) {
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const selected = e.target.files?.[0];
+    if (!selected) return;
+    const maxMb = status?.max_file_size_mb ?? 25;
+    const maxBytes = maxMb * 1024 * 1024;
+    if (selected.size > maxBytes) {
+      setToast(`${selected.name} exceeds ${maxMb} MB limit`, "error");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+    setPendingFile(selected);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  function handleKey(ev: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (ev.key === "Enter" && (ev.ctrlKey || ev.metaKey)) {
       ev.preventDefault();
       send().catch(() => undefined);
     }
   }
 
+  function adjustHeight(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    setInput(e.target.value);
+    e.target.style.height = "auto";
+    e.target.style.height = `${Math.min(e.target.scrollHeight, 200)}px`;
+  }
+
   if (statusLoading) {
     return (
-      <div className="page" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <Spinner size="md" /> Loading Telegram…
+      <div className="page">
+        <div className="loading-center">
+          <Spinner size="lg" />
+        </div>
       </div>
     );
   }
@@ -186,92 +333,272 @@ export function TelegramPage({ setToast }: Props) {
   }
 
   const botLabel = status.bot_username ? `@${status.bot_username}` : "bot";
+  const showAwaitingReply = awaitingReply(messages);
 
   return (
     <div
       style={{
         display: "flex",
         flexDirection: "column",
-        flex: 1,
-        padding: "var(--sp-4)",
+        height: "calc(100vh - 130px)",
         gap: "var(--sp-3)",
+        padding: "var(--sp-4)",
         minHeight: 0,
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)", flexShrink: 0 }}>
-        <span className="badge success">Connected</span>
-        <span style={{ fontSize: "var(--text-sm)", color: "var(--text-2)" }}>
-          Chat with {botLabel} — Hermes replies in Telegram
-        </span>
-        {messagesLoading ? <Spinner size="sm" /> : null}
+      {/* Options bar */}
+      <div className="card" style={{ flexShrink: 0 }}>
+        <div className="card-body" style={{ padding: "var(--sp-2) var(--sp-3)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", flexWrap: "wrap" }}>
+            <span className="badge success">Connected</span>
+            <span style={{ fontSize: "var(--text-sm)", color: "var(--text-2)", flex: 1, minWidth: 200 }}>
+              Chat with {botLabel} — Hermes replies in Telegram
+            </span>
+            {refreshing ? (
+              <span className="badge" title="Syncing messages">
+                syncing
+              </span>
+            ) : null}
+            <button
+              className="btn-ghost"
+              onClick={() => refreshMessages({ silent: true }).catch(() => undefined)}
+              disabled={refreshing}
+              style={{ marginLeft: "auto" }}
+            >
+              Refresh
+            </button>
+            {driveFolderLink ? (
+              <a
+                href={driveFolderLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-ghost drive-folder-btn"
+                title="Open Drive folder"
+              >
+                📁 Drive
+              </a>
+            ) : null}
+          </div>
+        </div>
       </div>
 
-      <div className="card" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-        <div className="card-body" style={{ flex: 1, overflow: "auto", minHeight: 0 }}>
-          {messages.length === 0 ? (
+      {/* Messages */}
+      <div
+        className="card"
+        style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column", position: "relative" }}
+      >
+        <div
+          ref={messagesScrollRef}
+          onScroll={handleScroll}
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            padding: "var(--sp-3)",
+            display: "flex",
+            flexDirection: "column",
+            gap: "var(--sp-3)",
+          }}
+        >
+          {messagesInitialLoad ? (
+            <div className="loading-center">
+              <Spinner size="md" />
+            </div>
+          ) : messages.length === 0 && !showAwaitingReply ? (
             <div className="empty-state">
-              <span className="empty-state-icon">✈️</span>
+              <span className="empty-state-icon">
+                <TelegramIcon size={28} />
+              </span>
               <span className="empty-state-title">No messages yet</span>
               <span className="empty-state-desc">
                 Send a message below. Replies from {botLabel} appear here after Hermes processes them.
               </span>
             </div>
           ) : (
-            <div className="messages">
+            <>
               {messages.map((message, i) => (
                 <motion.div
                   className="message"
                   key={message.id}
-                  initial={prefersReduced ? false : { opacity: 0, y: 4 }}
+                  initial={prefersReduced ? false : { opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: Math.min(i * 0.02, 0.3), duration: 0.2 }}
+                  transition={{ delay: Math.min(i * 0.01, 0.2), duration: 0.18 }}
                 >
-                  <div className={`message-bubble ${roleClass(message.role)}`}>
-                    <div className="message-content">{message.content}</div>
+                  <div className="message-header">
+                    <span className={`role-chip ${roleClass(message.role)}`}>{message.role}</span>
                     {message.timestamp ? (
-                      <div className="message-meta">{formatTimestamp(message.timestamp)}</div>
+                      <span className="badge" style={{ marginLeft: "auto" }}>
+                        {formatTimestamp(message.timestamp)}
+                      </span>
                     ) : null}
+                  </div>
+                  <div className="message-body">
+                    {message.has_media ? (
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "var(--sp-2)",
+                          marginBottom: message.content ? "var(--sp-2)" : 0,
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <span>{mediaIcon(message.media_type)}</span>
+                        <span style={{ fontSize: "var(--text-sm)" }}>
+                          {message.file_name || message.media_type || "Attachment"}
+                          {message.file_size ? ` · ${formatFileSize(message.file_size)}` : ""}
+                        </span>
+                        {!message.outgoing ? (
+                          <a
+                            href={telegramMediaDownloadUrl(message.id)}
+                            download={message.file_name || undefined}
+                            className="btn-ghost"
+                            style={{ padding: "2px 8px", fontSize: "var(--text-xs)" }}
+                          >
+                            Download
+                          </a>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    {message.content ? <pre>{message.content}</pre> : null}
                   </div>
                 </motion.div>
               ))}
-              <div ref={bottomRef} />
-            </div>
+
+              {showAwaitingReply ? (
+                <motion.div
+                  className="message"
+                  key="awaiting-reply"
+                  initial={prefersReduced ? false : { opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.18 }}
+                >
+                  <div className="message-header">
+                    <span className="role-chip assistant">assistant</span>
+                    <Spinner size="sm" />
+                  </div>
+                  <div className="message-body">
+                    <span style={{ color: "var(--text-3)", fontSize: "var(--text-sm)" }}>
+                      waiting for reply…
+                    </span>
+                  </div>
+                </motion.div>
+              ) : null}
+
+            </>
           )}
         </div>
 
-        <div
-          className="card-footer"
-          style={{
-            display: "flex",
-            gap: "var(--sp-2)",
-            alignItems: "flex-end",
-            borderTop: "1px solid var(--border)",
-            padding: "var(--sp-3)",
-          }}
-        >
-          <textarea
-            ref={textareaRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={onKeyDown}
-            placeholder={`Message ${botLabel}…`}
-            rows={1}
-            disabled={sending}
-            style={{ flex: 1, resize: "none", minHeight: 40, maxHeight: 160 }}
-            onInput={(e) => {
-              const el = e.currentTarget;
-              el.style.height = "auto";
-              el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+        {!pinnedToBottom && messages.length > 0 ? (
+          <button
+            className="btn-ghost"
+            onClick={() => {
+              setPinnedToBottom(true);
+              scrollToBottom(true);
             }}
-          />
-          <button className="primary" onClick={() => send()} disabled={sending || !input.trim()}>
-            {sending ? "Sending…" : "Send"}
+            title="Scroll to bottom"
+            style={{
+              position: "absolute",
+              right: "var(--sp-3)",
+              bottom: "var(--sp-3)",
+              borderRadius: "var(--r-full)",
+              padding: "6px 10px",
+              fontSize: "var(--text-sm)",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+              background: "var(--surface-2)",
+              border: "1px solid var(--border-subtle)",
+            }}
+          >
+            ↓
           </button>
+        ) : null}
+      </div>
+
+      {/* Input area */}
+      <div className="card" style={{ flexShrink: 0 }}>
+        <div
+          className="card-body"
+          style={{ padding: "var(--sp-2) var(--sp-3)", display: "flex", flexDirection: "column", gap: "var(--sp-2)" }}
+        >
+          {pendingFile ? (
+            <div className="chat-attach-bar">
+              <div className="chat-attach-item">
+                <span>📎</span>
+                <span className="chat-attach-name">{pendingFile.name}</span>
+                <span className="badge">{formatFileSize(pendingFile.size)}</span>
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  onClick={() => setPendingFile(null)}
+                  title="Remove attachment"
+                  style={{ marginLeft: "auto", padding: "2px 6px" }}
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          ) : null}
+          <div style={{ display: "flex", gap: "var(--sp-2)", alignItems: "flex-end" }}>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={ACCEPTED_EXTENSIONS}
+              onChange={handleFileSelect}
+              style={{ display: "none" }}
+            />
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={sending}
+              title="Attach file"
+              style={{ flexShrink: 0, padding: "4px 8px", fontSize: 18, lineHeight: 1 }}
+            >
+              📎
+            </button>
+            <textarea
+              ref={textareaRef}
+              value={input}
+              onChange={adjustHeight}
+              onKeyDown={handleKey}
+              placeholder={`Message ${botLabel}… (Ctrl+Enter to send)`}
+              disabled={sending}
+              rows={1}
+              style={{
+                flex: 1,
+                resize: "none",
+                minHeight: 36,
+                maxHeight: 200,
+                lineHeight: 1.5,
+                fontFamily: "var(--font)",
+                fontSize: "var(--text-md)",
+                overflowY: "auto",
+              }}
+            />
+            {sending ? (
+              <button
+                className="primary"
+                disabled
+                style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: "var(--sp-1)" }}
+              >
+                <Spinner size="sm" /> Sending
+              </button>
+            ) : (
+              <button
+                className="primary"
+                onClick={() => send().catch(() => undefined)}
+                disabled={!input.trim() && !pendingFile}
+                style={{ flexShrink: 0 }}
+              >
+                Send
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
       <p style={{ fontSize: "var(--text-xs)", color: "var(--text-3)", margin: 0, flexShrink: 0 }}>
-        Messages you send here appear in Telegram as your account. Bot replies refresh every few seconds.
+        Text and attachments (max {status.max_file_size_mb ?? 25} MB) are sent as your Telegram account.
+        Bot replies and files refresh every few seconds — use Download on received attachments.
       </p>
     </div>
   );

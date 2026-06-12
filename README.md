@@ -7,7 +7,7 @@ Ultron Controller est une interface unifiee pour piloter la memoire Hermes et Op
 - lecture des sessions Hermes depuis SQLite (`~/.hermes/state.db`)
 - recherche OpenViking + recherche FTS sur les sessions
 - **onglet Hermes** : communication complete avec l'API Server Hermes (chat live, runs, sessions, jobs, discovery)
-- **onglet Telegram** : envoi de messages a votre bot Telegram via MTProto (Hermes repond via le gateway deja configure)
+- **onglet Telegram** : envoi de messages et pieces jointes a votre bot Telegram via MTProto (Hermes repond via le gateway deja configure)
 
 ## Architecture
 
@@ -68,6 +68,7 @@ Variables pour l'onglet **Telegram** (MTProto — aucun appel Hermes API) :
 - `ULTRON_TELEGRAM_API_HASH` — API hash associe
 - `ULTRON_TELEGRAM_SESSION_STRING` — session Telethon (StringSession), generee une fois
 - `ULTRON_TELEGRAM_BOT_USERNAME` — username du bot sans `@` (ex. `my_hermes_bot`)
+- `ULTRON_TELEGRAM_MAX_FILE_SIZE_MB` (defaut: `25`) — taille max des pieces jointes (envoi et validation backend)
 
 Generation de la session (one-shot, terminal) :
 
@@ -91,6 +92,8 @@ Puis dans systemd : `EnvironmentFile=/etc/ultron-controller/secrets.env`
 **Securite** : la session string donne un acces complet a votre compte Telegram. Ne pas exposer Ultron sur Internet sans reverse proxy authentifie. Le backend demarre sans Telegram si les secrets sont absents (les autres modules restent disponibles).
 
 **Prerequis** : `hermes gateway` avec le bot Telegram deja configure ; le compte lie a la session string doit etre autorise (`TELEGRAM_ALLOWED_USERS`).
+
+**Pieces jointes** : l'onglet Telegram accepte l'envoi d'un fichier par message (texte optionnel comme legende). Types autorises : images (png, jpg, gif, webp), PDF, Office (doc/x, xls/x, ppt/x), texte (txt, csv), archives (zip), audio (mp3, ogg, wav, m4a), video (mp4, webm). Les medias recus du bot s'affichent dans l'historique ; telechargement via le bouton Download ou `GET /api/telegram/messages/{id}/media`. Limite Ultron : 25 Mo par defaut (`ULTRON_TELEGRAM_MAX_FILE_SIZE_MB`) ; Telegram peut rejeter des fichiers plus gros cote bot (~20 Mo).
 
 ## Developpement
 
@@ -240,9 +243,10 @@ SERVICE_NAME=ultron-controller ./deploy/deploy_frontend_and_restart.sh
 
 Ultron n'appelle pas Hermes pour cet onglet. Les messages partent vers le bot via votre compte Telegram ; Hermes repond dans l'app via le gateway deja configure.
 
-- `GET /api/telegram/status` — configuration, connectivite, `@bot`
-- `GET /api/telegram/messages?limit=50` — historique du dialog avec le bot
-- `POST /api/telegram/send` — `{ "text": "..." }` envoie un message au bot
+- `GET /api/telegram/status` — configuration, connectivite, `@bot`, `max_file_size_mb`
+- `GET /api/telegram/messages?limit=50` — historique du dialog avec le bot (texte + metadonnees media)
+- `GET /api/telegram/messages/{message_id}/media` — telecharge la piece jointe d'un message recu
+- `POST /api/telegram/send` — texte seul : `{ "text": "..." }` (JSON) ; texte et/ou fichier : `multipart/form-data` avec champs `text` (optionnel) et `file` (optionnel, un seul fichier)
 
 ## System Resource Manager
 

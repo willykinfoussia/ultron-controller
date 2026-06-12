@@ -1433,6 +1433,7 @@ export type TelegramStatus = {
   bot_username?: string | null;
   error?: string | null;
   missing?: string[];
+  max_file_size_mb?: number;
 };
 
 export type TelegramMessage = {
@@ -1441,6 +1442,11 @@ export type TelegramMessage = {
   content: string;
   timestamp?: string | null;
   outgoing?: boolean;
+  has_media?: boolean;
+  media_type?: string | null;
+  file_name?: string | null;
+  file_size?: number | null;
+  mime_type?: string | null;
 };
 
 export async function telegramStatus(): Promise<TelegramStatus> {
@@ -1453,10 +1459,24 @@ export async function telegramMessages(limit = 50): Promise<{ messages: Telegram
   );
 }
 
-export async function telegramSend(text: string): Promise<TelegramMessage> {
+export async function telegramSend(text: string, file?: File): Promise<TelegramMessage> {
+  if (file) {
+    const form = new FormData();
+    const trimmed = text.trim();
+    if (trimmed) form.append("text", trimmed);
+    form.append("file", file);
+    return request<TelegramMessage>("/api/telegram/send", {
+      method: "POST",
+      body: form,
+    });
+  }
   return request<TelegramMessage>("/api/telegram/send", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text }),
   });
+}
+
+export function telegramMediaDownloadUrl(messageId: number): string {
+  return `/api/telegram/messages/${messageId}/media`;
 }

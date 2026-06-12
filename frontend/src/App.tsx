@@ -12,6 +12,7 @@ import { SearchPage } from "./pages/SearchPage";
 import { SessionsPage } from "./pages/SessionsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { SystemPage } from "./pages/SystemPage";
+import { TelegramIcon } from "./components/TelegramIcon";
 import { TelegramPage } from "./pages/TelegramPage";
 
 /* ── Types ──────────────────────────────────────────────── */
@@ -43,7 +44,7 @@ const NAV: NavItem[] = [
   { id: "search",     label: "Search",     icon: "🔍", section: "knowledge" },
   { id: "hermes",     label: "Hermes",     icon: "🤖", section: "activity" },
   { id: "kanban",     label: "Kanban",     icon: "📊", section: "activity" },
-  { id: "telegram",   label: "Telegram",   icon: "✈️", section: "activity" },
+  { id: "telegram",   label: "Telegram",   icon: "telegram", section: "activity" },
   { id: "system",     label: "System",     icon: "🖥️", section: "system" },
   { id: "settings",   label: "Settings",   icon: "⚙️", section: "system" },
 ];
@@ -276,7 +277,9 @@ export default function App() {
                     aria-current={isActive ? "page" : undefined}
                     title={!sidebarOpen ? item.label : undefined}
                   >
-                    <span className="sidebar-link-icon" aria-hidden="true">{item.icon}</span>
+                    <span className="sidebar-link-icon" aria-hidden="true">
+                      {item.icon === "telegram" ? <TelegramIcon size={16} /> : item.icon}
+                    </span>
                     {sidebarOpen && (
                       <span className="sidebar-link-label">{item.label}</span>
                     )}

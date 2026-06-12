@@ -38,6 +38,11 @@ class Settings(BaseSettings):
     telegram_bot_username: str = ""
     telegram_messages_default_limit: int = 50
     telegram_messages_max_limit: int = 200
+    telegram_max_file_size_mb: int = 25
+
+    @property
+    def telegram_max_file_size_bytes(self) -> int:
+        return self.telegram_max_file_size_mb * 1024 * 1024
 
     @property
     def kanban_db(self) -> Path:
