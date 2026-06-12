@@ -18,13 +18,39 @@ import os
 import sys
 
 
+def _backend_venv_python() -> str | None:
+    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if os.name == "nt":
+        candidate = os.path.join(repo_root, "backend", ".venv", "Scripts", "python.exe")
+    else:
+        candidate = os.path.join(repo_root, "backend", ".venv", "bin", "python")
+    return candidate if os.path.isfile(candidate) else None
+
+
+def _ensure_backend_venv() -> None:
+    venv_python = _backend_venv_python()
+    if venv_python is None:
+        return
+    if os.path.realpath(sys.executable) == os.path.realpath(venv_python):
+        return
+    os.execv(venv_python, [venv_python, *sys.argv])
+
+
+_ensure_backend_venv()
+
+
 async def main() -> None:
     try:
         from telethon import TelegramClient
         from telethon.errors import SessionPasswordNeededError
         from telethon.sessions import StringSession
     except ImportError:
-        print("Install telethon first: cd backend && uv sync", file=sys.stderr)
+        print(
+            "Telethon not found. Install deps then re-run:\n"
+            "  cd backend && uv sync\n"
+            "  cd .. && python scripts/telegram_session_setup.py",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     api_id_raw = os.environ.get("ULTRON_TELEGRAM_API_ID", "").strip()
