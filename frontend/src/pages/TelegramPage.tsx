@@ -172,7 +172,7 @@ export function TelegramPage({ setToast }: Props) {
   if (statusLoading) {
     return (
       <div className="page" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <Spinner label="Loading Telegram…" />
+        <Spinner size="md" /> Loading Telegram…
       </div>
     );
   }
