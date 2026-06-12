@@ -32,6 +32,13 @@ class Settings(BaseSettings):
     hermes_api_timeout_sec: float = 120.0
     kanban_db_path: str = ""  # resolved in property below
 
+    telegram_api_id: int = 0
+    telegram_api_hash: str = ""
+    telegram_session_string: str = ""
+    telegram_bot_username: str = ""
+    telegram_messages_default_limit: int = 50
+    telegram_messages_max_limit: int = 200
+
     @property
     def kanban_db(self) -> Path:
         if self.kanban_db_path:
@@ -56,6 +63,15 @@ class Settings(BaseSettings):
     @property
     def frontend_dist(self) -> Path:
         return Path(__file__).resolve().parents[3] / "frontend" / "dist"
+
+    @property
+    def telegram_configured(self) -> bool:
+        return bool(
+            self.telegram_api_id
+            and self.telegram_api_hash.strip()
+            and self.telegram_session_string.strip()
+            and self.telegram_bot_username.strip()
+        )
 
 
 @lru_cache

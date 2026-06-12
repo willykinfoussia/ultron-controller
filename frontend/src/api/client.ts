@@ -1424,3 +1424,39 @@ export async function uploadToDrive(file: File): Promise<GwsUploadResult> {
 export async function getHermesFolder(): Promise<GwsHermesFolder> {
   return request<GwsHermesFolder>("/api/gws/hermes-folder");
 }
+
+/* ── Telegram (MTProto user client) ─────────────────────── */
+
+export type TelegramStatus = {
+  configured: boolean;
+  connected: boolean;
+  bot_username?: string | null;
+  error?: string | null;
+  missing?: string[];
+};
+
+export type TelegramMessage = {
+  id: number;
+  role: "user" | "assistant" | string;
+  content: string;
+  timestamp?: string | null;
+  outgoing?: boolean;
+};
+
+export async function telegramStatus(): Promise<TelegramStatus> {
+  return request<TelegramStatus>("/api/telegram/status");
+}
+
+export async function telegramMessages(limit = 50): Promise<{ messages: TelegramMessage[]; count: number }> {
+  return request<{ messages: TelegramMessage[]; count: number }>(
+    `/api/telegram/messages?limit=${limit}`,
+  );
+}
+
+export async function telegramSend(text: string): Promise<TelegramMessage> {
+  return request<TelegramMessage>("/api/telegram/send", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  });
+}

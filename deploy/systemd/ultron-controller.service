@@ -10,6 +10,8 @@ WorkingDirectory=/home/opc/ultron-controller/backend
 Environment=PATH=/home/opc/.local/bin:/usr/local/bin:/usr/bin
 Environment=ULTRON_OPENVIKING_ENDPOINT=http://127.0.0.1:1933
 Environment=ULTRON_HERMES_HOME=/home/opc/.hermes
+# Optional Telegram secrets (see README):
+# EnvironmentFile=/etc/ultron-controller/secrets.env
 ExecStart=/usr/bin/env uv run uvicorn app.main:app --port 9000
 Restart=always
 RestartSec=10

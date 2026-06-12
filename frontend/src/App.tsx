@@ -12,9 +12,10 @@ import { SearchPage } from "./pages/SearchPage";
 import { SessionsPage } from "./pages/SessionsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { SystemPage } from "./pages/SystemPage";
+import { TelegramPage } from "./pages/TelegramPage";
 
 /* ── Types ──────────────────────────────────────────────── */
-type TabId = "openviking" | "memory" | "sessions" | "search" | "system" | "hermes" | "kanban" | "settings";
+type TabId = "openviking" | "memory" | "sessions" | "search" | "system" | "hermes" | "kanban" | "telegram" | "settings";
 type Theme  = "dark" | "light";
 type AccentId = "indigo" | "blue" | "cyan" | "emerald" | "rose" | "amber";
 type HermesLedStatus = "up_to_date" | "outdated" | "unknown";
@@ -42,6 +43,7 @@ const NAV: NavItem[] = [
   { id: "search",     label: "Search",     icon: "🔍", section: "knowledge" },
   { id: "hermes",     label: "Hermes",     icon: "🤖", section: "activity" },
   { id: "kanban",     label: "Kanban",     icon: "📊", section: "activity" },
+  { id: "telegram",   label: "Telegram",   icon: "✈️", section: "activity" },
   { id: "system",     label: "System",     icon: "🖥️", section: "system" },
   { id: "settings",   label: "Settings",   icon: "⚙️", section: "system" },
 ];
@@ -216,6 +218,7 @@ export default function App() {
     if (activeTab === "system")     return <SystemPage {...props} />;
     if (activeTab === "hermes")     return <HermesPage {...props} />;
     if (activeTab === "kanban")     return <KanbanBoardPage {...props} />;
+    if (activeTab === "telegram")   return <TelegramPage {...props} />;
     if (activeTab === "settings")   return (
       <SettingsPage
         theme={theme}

@@ -7,6 +7,7 @@ Ultron Controller est une interface unifiee pour piloter la memoire Hermes et Op
 - lecture des sessions Hermes depuis SQLite (`~/.hermes/state.db`)
 - recherche OpenViking + recherche FTS sur les sessions
 - **onglet Hermes** : communication complete avec l'API Server Hermes (chat live, runs, sessions, jobs, discovery)
+- **onglet Telegram** : envoi de messages a votre bot Telegram via MTProto (Hermes repond via le gateway deja configure)
 
 ## Architecture
 
@@ -61,6 +62,35 @@ Variables pour l'onglet **Hermes** (API Server) :
 - `ULTRON_HERMES_API_BASE_URL` (defaut: `http://127.0.0.1:8642`) — URL de l'API Server Hermes
 - `ULTRON_HERMES_API_KEY` (defaut: `hermes-ultron-api-server`) — Bearer token (doit correspondre a `API_SERVER_KEY` dans `~/.hermes/.env`)
 - `ULTRON_HERMES_API_TIMEOUT_SEC` (defaut: `120`) — timeout en secondes pour les appels a l'API Hermes
+
+Variables pour l'onglet **Telegram** (MTProto — aucun appel Hermes API) :
+- `ULTRON_TELEGRAM_API_ID` — API ID depuis [my.telegram.org](https://my.telegram.org)
+- `ULTRON_TELEGRAM_API_HASH` — API hash associe
+- `ULTRON_TELEGRAM_SESSION_STRING` — session Telethon (StringSession), generee une fois
+- `ULTRON_TELEGRAM_BOT_USERNAME` — username du bot sans `@` (ex. `my_hermes_bot`)
+
+Generation de la session (one-shot, terminal) :
+
+```bash
+export ULTRON_TELEGRAM_API_ID=12345678
+export ULTRON_TELEGRAM_API_HASH=your_api_hash
+python scripts/telegram_session_setup.py
+```
+
+Copier la sortie dans un fichier secrets serveur (ex. `/etc/ultron-controller/secrets.env`) :
+
+```bash
+ULTRON_TELEGRAM_API_ID=12345678
+ULTRON_TELEGRAM_API_HASH=abcdef...
+ULTRON_TELEGRAM_SESSION_STRING=1AgA...
+ULTRON_TELEGRAM_BOT_USERNAME=my_hermes_bot
+```
+
+Puis dans systemd : `EnvironmentFile=/etc/ultron-controller/secrets.env`
+
+**Securite** : la session string donne un acces complet a votre compte Telegram. Ne pas exposer Ultron sur Internet sans reverse proxy authentifie. Le backend demarre sans Telegram si les secrets sont absents (les autres modules restent disponibles).
+
+**Prerequis** : `hermes gateway` avec le bot Telegram deja configure ; le compte lie a la session string doit etre autorise (`TELEGRAM_ALLOWED_USERS`).
 
 ## Developpement
 
@@ -205,6 +235,14 @@ SERVICE_NAME=ultron-controller ./deploy/deploy_frontend_and_restart.sh
 - `POST /api/hermes_api/sessions/{id}/fork`
 - `POST /api/hermes_api/sessions/{id}/chat`
 - `POST /api/hermes_api/sessions/{id}/chat/stream` (SSE)
+
+### API Telegram (MTProto user client, prefixe `/api/telegram`)
+
+Ultron n'appelle pas Hermes pour cet onglet. Les messages partent vers le bot via votre compte Telegram ; Hermes repond dans l'app via le gateway deja configure.
+
+- `GET /api/telegram/status` — configuration, connectivite, `@bot`
+- `GET /api/telegram/messages?limit=50` — historique du dialog avec le bot
+- `POST /api/telegram/send` — `{ "text": "..." }` envoie un message au bot
 
 ## System Resource Manager
 
