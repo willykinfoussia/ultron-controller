@@ -2,6 +2,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -145,29 +146,27 @@ export function TelegramPage({ setToast }: Props) {
   const [driveFolderLink, setDriveFolderLink] = useState<string | null>(null);
   const [pinnedToBottom, setPinnedToBottom] = useState(true);
   const messagesScrollRef = useRef<HTMLDivElement>(null);
+  const bottomAnchorRef = useRef<HTMLDivElement>(null);
+  const pinnedToBottomRef = useRef(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isInitialLoadRef = useRef(true);
   const lastSeenMessageIdRef = useRef<number | null>(null);
-  const scrollAfterSendRef = useRef(false);
-  const initialScrollDoneRef = useRef(false);
 
-  const scrollToBottom = useCallback(
-    (force = false) => {
-      const el = messagesScrollRef.current;
-      if (!el) return;
-      if (!force && !isNearBottom(el)) return;
+  const scrollToBottom = useCallback((force = false) => {
+    if (!force && !pinnedToBottomRef.current) return;
 
-      const target = el.scrollHeight;
-      if (prefersReduced || !force) {
-        el.scrollTop = target;
-        return;
-      }
+    const anchor = bottomAnchorRef.current;
+    if (anchor) {
+      anchor.scrollIntoView({ block: "end" });
+      return;
+    }
 
-      el.scrollTo({ top: target, behavior: "smooth" });
-    },
-    [prefersReduced],
-  );
+    const el = messagesScrollRef.current;
+    if (el) {
+      el.scrollTop = el.scrollHeight;
+    }
+  }, []);
 
   const refreshStatus = useCallback(async () => {
     try {
@@ -191,22 +190,10 @@ export function TelegramPage({ setToast }: Props) {
       }
       try {
         const data = await telegramMessages(80);
-        const prevId = lastSeenMessageIdRef.current;
         const nextId = lastMessageId(data.messages);
-        const hasNewMessage = nextId !== null && nextId !== prevId;
 
         setMessages(data.messages);
         lastSeenMessageIdRef.current = nextId;
-
-        if (!initialScrollDoneRef.current && data.messages.length > 0) {
-          initialScrollDoneRef.current = true;
-          requestAnimationFrame(() => scrollToBottom(true));
-        } else if (scrollAfterSendRef.current) {
-          scrollAfterSendRef.current = false;
-          requestAnimationFrame(() => scrollToBottom(true));
-        } else if (hasNewMessage) {
-          requestAnimationFrame(() => scrollToBottom(false));
-        }
       } catch (err) {
         setToast(String(err), "error");
       } finally {
@@ -217,7 +204,7 @@ export function TelegramPage({ setToast }: Props) {
         }
       }
     },
-    [setToast, status?.connected, scrollToBottom],
+    [setToast, status?.connected],
   );
 
   useEffect(() => {
@@ -234,8 +221,9 @@ export function TelegramPage({ setToast }: Props) {
     if (!status?.connected) return;
     isInitialLoadRef.current = true;
     setMessagesInitialLoad(true);
-    initialScrollDoneRef.current = false;
     lastSeenMessageIdRef.current = null;
+    pinnedToBottomRef.current = true;
+    setPinnedToBottom(true);
     refreshMessages({ silent: false }).catch(() => undefined);
   }, [status?.connected, refreshMessages]);
 
@@ -247,16 +235,21 @@ export function TelegramPage({ setToast }: Props) {
     return () => window.clearInterval(id);
   }, [refreshMessages, status?.connected]);
 
-  useEffect(() => {
-    if (awaitingReply(messages) && pinnedToBottom) {
-      requestAnimationFrame(() => scrollToBottom(false));
+  const showAwaitingReply = awaitingReply(messages);
+
+  useLayoutEffect(() => {
+    if (messagesInitialLoad) return;
+    if (pinnedToBottomRef.current) {
+      scrollToBottom(false);
     }
-  }, [messages, pinnedToBottom, scrollToBottom]);
+  }, [messages, showAwaitingReply, messagesInitialLoad, scrollToBottom]);
 
   function handleScroll() {
     const el = messagesScrollRef.current;
     if (!el) return;
-    setPinnedToBottom(isNearBottom(el));
+    const nearBottom = isNearBottom(el);
+    pinnedToBottomRef.current = nearBottom;
+    setPinnedToBottom(nearBottom);
   }
 
   async function send() {
@@ -268,7 +261,7 @@ export function TelegramPage({ setToast }: Props) {
     if (textareaRef.current) textareaRef.current.style.height = "auto";
     if (fileInputRef.current) fileInputRef.current.value = "";
     setSending(true);
-    scrollAfterSendRef.current = true;
+    pinnedToBottomRef.current = true;
     setPinnedToBottom(true);
     try {
       const sent = await telegramSend(text, file ?? undefined);
@@ -277,10 +270,8 @@ export function TelegramPage({ setToast }: Props) {
         lastSeenMessageIdRef.current = lastMessageId(next);
         return next;
       });
-      requestAnimationFrame(() => scrollToBottom(true));
       refreshMessages({ silent: true }).catch(() => undefined);
     } catch (err) {
-      scrollAfterSendRef.current = false;
       setToast(String(err), "error");
     } finally {
       setSending(false);
@@ -333,7 +324,6 @@ export function TelegramPage({ setToast }: Props) {
   }
 
   const botLabel = status.bot_username ? `@${status.bot_username}` : "bot";
-  const showAwaitingReply = awaitingReply(messages);
 
   return (
     <div
@@ -484,6 +474,7 @@ export function TelegramPage({ setToast }: Props) {
                 </motion.div>
               ) : null}
 
+              <div ref={bottomAnchorRef} aria-hidden="true" style={{ height: 0, flexShrink: 0 }} />
             </>
           )}
         </div>
@@ -492,6 +483,7 @@ export function TelegramPage({ setToast }: Props) {
           <button
             className="btn-ghost"
             onClick={() => {
+              pinnedToBottomRef.current = true;
               setPinnedToBottom(true);
               scrollToBottom(true);
             }}
