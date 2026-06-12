@@ -332,6 +332,12 @@ export default function App() {
             >
               Hermes
             </button>
+            <button
+              className={`topbar-nav-link ${activeTab === "telegram" ? "active" : ""}`}
+              onClick={() => setActiveTab("telegram")}
+            >
+              Telegram
+            </button>
           </div>
           <div className="topbar-right">
             <button
