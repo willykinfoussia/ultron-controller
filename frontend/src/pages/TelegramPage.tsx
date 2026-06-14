@@ -85,6 +85,141 @@ function mergeSentMessage(messages: TelegramMessage[], sent: TelegramMessage): T
   return [...messages, sent];
 }
 
+function AudioPlayer({ messageId, fileName, autoPlay }: { messageId: number; fileName?: string | null; autoPlay?: boolean }) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+
+  const loadAudio = useCallback(async () => {
+    if (audioRef.current?.src) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const resp = await fetch(telegramMediaDownloadUrl(messageId));
+      if (!resp.ok) throw new Error(`Failed to load audio (${resp.status})`);
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      if (audioRef.current) {
+        audioRef.current.src = url;
+      }
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setLoading(false);
+    }
+  }, [messageId]);
+
+  const togglePlay = useCallback(async () => {
+    const el = audioRef.current;
+    if (!el) return;
+    if (!el.src) {
+      await loadAudio();
+      // wait a tick for src to be set
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    if (el.paused) {
+      el.play().catch(() => undefined);
+      setPlaying(true);
+    } else {
+      el.pause();
+      setPlaying(false);
+    }
+  }, [loadAudio]);
+
+  const handleTimeUpdate = useCallback(() => {
+    const el = audioRef.current;
+    if (!el) return;
+    setCurrentTime(el.currentTime);
+    if (el.duration) {
+      setProgress(el.currentTime / el.duration);
+    }
+  }, []);
+
+  const handleLoadedMetadata = useCallback(() => {
+    const el = audioRef.current;
+    if (el?.duration) setDuration(el.duration);
+  }, []);
+
+  const handleEnded = useCallback(() => {
+    setPlaying(false);
+    setProgress(0);
+    setCurrentTime(0);
+  }, []);
+
+  const handleSeek = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const el = audioRef.current;
+    if (!el || !duration) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pct = (e.clientX - rect.left) / rect.width;
+    el.currentTime = pct * duration;
+  }, [duration]);
+
+  // Auto-play when component mounts if autoPlay is true
+  useEffect(() => {
+    if (autoPlay) {
+      togglePlay();
+    }
+  }, [autoPlay, togglePlay]);
+
+  const fmtTime = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return `${m}:${sec.toString().padStart(2, "0")}`;
+  };
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)", flexWrap: "wrap" }}>
+      <audio
+        ref={audioRef}
+        onTimeUpdate={handleTimeUpdate}
+        onLoadedMetadata={handleLoadedMetadata}
+        onEnded={handleEnded}
+        preload="none"
+      />
+      <button
+        className="btn-ghost"
+        onClick={togglePlay}
+        disabled={loading}
+        style={{ padding: "2px 10px", fontSize: "var(--text-xs)", minWidth: 60 }}
+      >
+        {loading ? "⏳" : playing ? "⏸ Pause" : "▶ Play"}
+      </button>
+      <div
+        onClick={handleSeek}
+        style={{
+          flex: 1,
+          minWidth: 120,
+          height: 6,
+          background: "var(--border-subtle)",
+          borderRadius: 3,
+          cursor: "pointer",
+          position: "relative",
+        }}
+      >
+        <div
+          style={{
+            width: `${progress * 100}%`,
+            height: "100%",
+            background: "var(--accent, #2E75B6)",
+            borderRadius: 3,
+            transition: "width 0.1s",
+          }}
+        />
+      </div>
+      <span style={{ fontSize: "var(--text-xs)", color: "var(--text-3)", minWidth: 70, textAlign: "right" }}>
+        {duration ? `${fmtTime(currentTime)} / ${fmtTime(duration)}` : fileName || "Audio"}
+      </span>
+      {error ? (
+        <span style={{ fontSize: "var(--text-xs)", color: "var(--danger)" }}>⚠ {error}</span>
+      ) : null}
+    </div>
+  );
+}
+
 function SetupHelp({ status }: { status: TelegramStatus | null }) {
   const missing = status?.missing ?? [
     "telegram_api_id",
@@ -437,7 +572,10 @@ export function TelegramPage({ setToast }: Props) {
                           {message.file_name || message.media_type || "Attachment"}
                           {message.file_size ? ` · ${formatFileSize(message.file_size)}` : ""}
                         </span>
-                        {!message.outgoing ? (
+                        {(message.media_type === "voice" || message.media_type === "audio") && !message.outgoing ? (
+                          <AudioPlayer messageId={message.id} fileName={message.file_name} autoPlay={message.role === "assistant"} />
+                        ) : null}
+                        {message.media_type !== "voice" && message.media_type !== "audio" && !message.outgoing ? (
                           <a
                             href={telegramMediaDownloadUrl(message.id)}
                             download={message.file_name || undefined}
