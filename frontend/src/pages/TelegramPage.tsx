@@ -438,30 +438,42 @@ export function TelegramPage({ setToast }: Props) {
                           {message.file_size ? ` · ${formatFileSize(message.file_size)}` : ""}
                         </span>
                         {!message.outgoing ? (
-                          <>
-                            {message.drive_links?.map((link, idx) => (
-                              <a
-                                key={idx}
-                                href={link}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="btn-ghost"
-                                style={{ padding: "2px 8px", fontSize: "var(--text-xs)" }}
-                              >
-                                📁 Download Drive
-                              </a>
-                            ))}
-                            {!message.drive_links?.length ? (
-                              <a
-                                href={telegramMediaDownloadUrl(message.id)}
-                                download={message.file_name || undefined}
-                                className="btn-ghost"
-                                style={{ padding: "2px 8px", fontSize: "var(--text-xs)" }}
-                              >
-                                Download
-                              </a>
-                            ) : null}
-                          </>
+                          <a
+                            href={telegramMediaDownloadUrl(message.id)}
+                            download={message.file_name || undefined}
+                            className="btn-ghost"
+                            style={{ padding: "2px 8px", fontSize: "var(--text-xs)" }}
+                          >
+                            Download
+                          </a>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    {message.drive_links?.length ? (
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "var(--sp-2)",
+                          marginBottom: message.content ? "var(--sp-2)" : 0,
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <span>📁</span>
+                        <span style={{ fontSize: "var(--text-sm)" }}>Google Drive</span>
+                        {!message.outgoing ? (
+                          message.drive_links.map((link, idx) => (
+                            <a
+                              key={idx}
+                              href={link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="btn-ghost"
+                              style={{ padding: "2px 8px", fontSize: "var(--text-xs)" }}
+                            >
+                              Download Drive
+                            </a>
+                          ))
                         ) : null}
                       </div>
                     ) : null}
