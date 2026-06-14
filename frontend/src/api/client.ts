@@ -1447,6 +1447,7 @@ export type TelegramMessage = {
   file_name?: string | null;
   file_size?: number | null;
   mime_type?: string | null;
+  drive_links?: string[];
 };
 
 export async function telegramStatus(): Promise<TelegramStatus> {

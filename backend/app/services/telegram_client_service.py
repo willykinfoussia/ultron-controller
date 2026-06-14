@@ -48,9 +48,10 @@ class TelegramMessageDTO:
     file_name: str | None = None
     file_size: int | None = None
     mime_type: str | None = None
+    drive_links: list[str] | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        result = {
             "id": self.id,
             "role": self.role,
             "content": self.content,
@@ -62,6 +63,9 @@ class TelegramMessageDTO:
             "file_size": self.file_size,
             "mime_type": self.mime_type,
         }
+        if self.drive_links:
+            result["drive_links"] = self.drive_links
+        return result
 
 
 class TelegramClientService:
@@ -232,6 +236,16 @@ class TelegramClientService:
         return f"[{media_type.capitalize()}]"
 
     @classmethod
+    def _extract_drive_links(cls, text: str) -> list[str]:
+        """Extract Google Drive links from message text."""
+        import re
+        if not text:
+            return []
+        # Match various Google Drive URL formats
+        pattern = r'https?://drive\.google\.com/[^\s\)\"\']+|https?://docs\.google\.com/[^\s\)\"\']+'
+        return list(dict.fromkeys(re.findall(pattern, text)))
+
+    @classmethod
     def _message_to_dto(cls, message: Message, *, bot_id: int) -> TelegramMessageDTO | None:
         del bot_id  # reserved for future role heuristics
         media = cls.extract_media_info(message)
@@ -242,6 +256,7 @@ class TelegramClientService:
         outgoing = bool(message.out)
         role = "user" if outgoing else "assistant"
         content = text or cls._media_fallback_label(media)
+        drive_links = cls._extract_drive_links(text)
 
         return TelegramMessageDTO(
             id=message.id,
@@ -254,6 +269,7 @@ class TelegramClientService:
             file_name=media["file_name"],
             file_size=media["file_size"],
             mime_type=media["mime_type"],
+            drive_links=drive_links if drive_links else None,
         )
 
     def _validate_upload(self, upload: UploadFile) -> tuple[str, str]:

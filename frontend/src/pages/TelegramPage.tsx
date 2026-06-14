@@ -438,14 +438,30 @@ export function TelegramPage({ setToast }: Props) {
                           {message.file_size ? ` · ${formatFileSize(message.file_size)}` : ""}
                         </span>
                         {!message.outgoing ? (
-                          <a
-                            href={telegramMediaDownloadUrl(message.id)}
-                            download={message.file_name || undefined}
-                            className="btn-ghost"
-                            style={{ padding: "2px 8px", fontSize: "var(--text-xs)" }}
-                          >
-                            Download
-                          </a>
+                          <>
+                            {message.drive_links?.map((link, idx) => (
+                              <a
+                                key={idx}
+                                href={link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="btn-ghost"
+                                style={{ padding: "2px 8px", fontSize: "var(--text-xs)" }}
+                              >
+                                📁 Download Drive
+                              </a>
+                            ))}
+                            {!message.drive_links?.length ? (
+                              <a
+                                href={telegramMediaDownloadUrl(message.id)}
+                                download={message.file_name || undefined}
+                                className="btn-ghost"
+                                style={{ padding: "2px 8px", fontSize: "var(--text-xs)" }}
+                              >
+                                Download
+                              </a>
+                            ) : null}
+                          </>
                         ) : null}
                       </div>
                     ) : null}
