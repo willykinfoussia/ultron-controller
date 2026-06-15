@@ -217,9 +217,11 @@ class TelegramClientService:
                 "mime_type": mime,
             }
 
+        # Non-file media types (web page previews, geo, contact, etc.)
+        # Don't treat them as file attachments — the text content is sufficient.
         return {
-            "has_media": True,
-            "media_type": "unknown",
+            "has_media": False,
+            "media_type": None,
             "file_name": None,
             "file_size": None,
             "mime_type": None,
