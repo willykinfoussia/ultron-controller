@@ -11,3 +11,5 @@ export function Spinner({ size = "md" }: SpinnerProps) {
     />
   );
 }
+
+export default Spinner;

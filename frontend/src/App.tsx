@@ -15,9 +15,10 @@ import { SystemPage } from "./pages/SystemPage";
 import { TelegramIcon } from "./components/TelegramIcon";
 import { TelegramPage } from "./pages/TelegramPage";
 import { StocksPage } from "./pages/StocksPage";
+import AnalysisPage from "./pages/Analysis";
 
 /* ── Types ──────────────────────────────────────────────── */
-type TabId = "openviking" | "memory" | "sessions" | "search" | "system" | "hermes" | "kanban" | "telegram" | "settings" | "stocks";
+type TabId = "openviking" | "memory" | "sessions" | "search" | "system" | "hermes" | "kanban" | "telegram" | "settings" | "stocks" | "analysis";
 type Theme  = "dark" | "light";
 type AccentId = "indigo" | "blue" | "cyan" | "emerald" | "rose" | "amber";
 type HermesLedStatus = "up_to_date" | "outdated" | "unknown";
@@ -47,6 +48,7 @@ const NAV: NavItem[] = [
   { id: "kanban",     label: "Kanban",     icon: "📊", section: "activity" },
   { id: "telegram",   label: "Telegram",   icon: "telegram", section: "activity" },
   { id: "stocks",     label: "Stocks",     icon: "📈", section: "activity" },
+  { id: "analysis",   label: "Analysis",   icon: "🔬", section: "activity" },
   { id: "system",     label: "System",     icon: "🖥️", section: "system" },
   { id: "settings",   label: "Settings",   icon: "⚙️", section: "system" },
 ];
@@ -223,6 +225,7 @@ export default function App() {
     if (activeTab === "kanban")     return <KanbanBoardPage {...props} />;
     if (activeTab === "telegram")   return <TelegramPage {...props} />;
     if (activeTab === "stocks")     return <StocksPage {...props} />;
+    if (activeTab === "analysis")   return <AnalysisPage />;
     if (activeTab === "settings")   return (
       <SettingsPage
         theme={theme}
