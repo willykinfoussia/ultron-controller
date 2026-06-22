@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Callable
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
@@ -94,6 +94,24 @@ if frontend_dist.exists():
     assets_dir = frontend_dist / "assets"
     if assets_dir.exists():
         app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+
+    # Serve root-level static files (favicon.svg, robots.txt, manifest.json, etc.)
+    # before the SPA fallback catches them
+    root_static = [
+        "favicon.svg", "favicon.ico", "robots.txt",
+        "manifest.json", "apple-touch-icon.png",
+    ]
+    for _f in root_static:
+        _p = frontend_dist / _f
+        if _p.exists():
+            _route = f"/{_f}"
+
+            def _make_handler(path: str = str(_p)) -> Callable:
+                async def _handler() -> FileResponse:
+                    return FileResponse(path)
+                return _handler
+
+            app.get(_route, include_in_schema=False)(_make_handler())
 
     @app.get("/{full_path:path}")
     async def spa_fallback(full_path: str) -> FileResponse:  # noqa: ARG001
