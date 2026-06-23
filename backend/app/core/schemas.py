@@ -40,6 +40,14 @@ class StorageScanQuery(BaseModel):
     limit: int = Field(default=10, ge=1, le=100)
 
 
+class StorageAnalyzeQuery(BaseModel):
+    path: str = Field(min_length=1, max_length=2048)
+    depth: int = Field(default=4, ge=1, le=16)
+    limit: int = Field(default=20, ge=1, le=100)
+    old_days: int = Field(default=180, ge=1, le=3650)
+    min_size: int = Field(default=1024 * 1024, ge=0, le=1024 * 1024 * 1024)
+
+
 # ── Hermes API Server schemas ─────────────────────────────────────────────────
 
 class HermesChatMessageContentPart(BaseModel):

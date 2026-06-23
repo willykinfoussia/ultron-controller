@@ -55,3 +55,21 @@ async def storage_top_files(
         raise
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"Top files scan failed: {exc}") from exc
+
+
+@router.get("/analyze")
+async def storage_analyze(
+    path: str = Query(..., min_length=1, max_length=2048),
+    depth: int = Query(default=4, ge=1, le=16),
+    limit: int = Query(default=20, ge=1, le=100),
+    old_days: int = Query(default=180, ge=1, le=3650),
+    min_size: int = Query(default=1024 * 1024, ge=0, le=1024 * 1024 * 1024),
+) -> dict:
+    try:
+        return await _service().analyze(
+            path=path, depth=depth, limit=limit, old_days=old_days, min_size=min_size
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"Storage analyze failed: {exc}") from exc

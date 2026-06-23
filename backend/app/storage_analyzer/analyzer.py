@@ -5,7 +5,8 @@ import time
 from threading import Lock
 from pathlib import Path
 
-from app.storage_analyzer.scanner import scan_directory
+from app.storage_analyzer.analysis import analyze_records
+from app.storage_analyzer.scanner import scan_directory, walk_records
 
 
 class StorageAnalyzer:
@@ -48,6 +49,7 @@ class StorageAnalyzer:
         exclude_system_paths: bool,
     ) -> dict:
         cache_key = self._cache_key(
+            mode="scan",
             path=str(path),
             depth=depth,
             limit=limit,
@@ -69,5 +71,59 @@ class StorageAnalyzer:
             timeout_sec=timeout_sec,
             follow_symlinks=follow_symlinks,
             exclude_system_paths=exclude_system_paths,
+        )
+        return self._set_cached(cache_key, {**result, "from_cache": False})
+
+    def analyze(
+        self,
+        path: Path,
+        depth: int,
+        limit: int,
+        max_entries: int,
+        timeout_sec: float,
+        follow_symlinks: bool,
+        exclude_system_paths: bool,
+        old_days: int,
+        min_file_size: int,
+        dup_min_size: int,
+        dup_max_hashes: int,
+        hash_budget_sec: float,
+    ) -> dict:
+        cache_key = self._cache_key(
+            mode="analyze",
+            path=str(path),
+            depth=depth,
+            limit=limit,
+            max_entries=max_entries,
+            timeout_sec=timeout_sec,
+            follow_symlinks=follow_symlinks,
+            exclude_system_paths=exclude_system_paths,
+            old_days=old_days,
+            min_file_size=min_file_size,
+            dup_min_size=dup_min_size,
+            dup_max_hashes=dup_max_hashes,
+            hash_budget_sec=hash_budget_sec,
+        )
+
+        cached = self._get_cached(cache_key)
+        if cached is not None:
+            return {**cached, "from_cache": True}
+
+        walk = walk_records(
+            root_path=path,
+            max_depth=depth,
+            max_entries=max_entries,
+            timeout_sec=timeout_sec,
+            follow_symlinks=follow_symlinks,
+            exclude_system_paths=exclude_system_paths,
+        )
+        result = analyze_records(
+            walk,
+            limit=limit,
+            old_days=old_days,
+            min_file_size=min_file_size,
+            dup_min_size=dup_min_size,
+            dup_max_hashes=dup_max_hashes,
+            hash_budget_sec=hash_budget_sec,
         )
         return self._set_cached(cache_key, {**result, "from_cache": False})

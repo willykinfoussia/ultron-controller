@@ -104,6 +104,78 @@ export type StorageTopResponse = {
   meta: StorageScanMeta;
 };
 
+export type Deletability = {
+  score: number;
+  level: "low" | "medium" | "high";
+  reasons: string[];
+};
+
+export type FileInsight = {
+  path: string;
+  size: number;
+  mtime: number;
+  atime: number;
+  age_days: number;
+  category: string;
+  junk_kind: string | null;
+  deletability: Deletability;
+};
+
+export type CategoryInsight = {
+  category: string;
+  size: number;
+  count: number;
+};
+
+export type JunkEntry = {
+  kind: string;
+  size: number;
+  count: number;
+  sample_paths: string[];
+};
+
+export type DuplicateGroup = {
+  size: number;
+  count: number;
+  wasted: number;
+  paths: string[];
+};
+
+export type StorageAnalysisSummary = {
+  total_size: number;
+  file_count: number;
+  recoverable_estimate: number;
+  junk_size: number;
+  duplicate_wasted: number;
+  top_category: string;
+};
+
+export type StorageAnalysis = {
+  status: "ok" | "partial";
+  path: string;
+  summary: StorageAnalysisSummary;
+  categories: CategoryInsight[];
+  largest_files: FileInsight[];
+  junk: JunkEntry[];
+  old_files: FileInsight[];
+  duplicates: DuplicateGroup[];
+  top_folders: StorageEntry[];
+  top_files: StorageEntry[];
+  entries_visited: number;
+  permission_denied: number;
+  partial: boolean;
+  stop_reason: string;
+  elapsed_ms: number;
+  generated_at: number;
+  from_cache: boolean;
+  analysis_meta: {
+    old_days: number;
+    min_file_size: number;
+    hashes_computed: number;
+    duplicate_groups_found: number;
+  };
+};
+
 async function request<T>(input: string, init?: RequestInit): Promise<T> {
   const response = await fetch(input, init);
   const raw = await response.text();
@@ -366,6 +438,18 @@ export async function storageTopFolders(path: string, depth = 4, limit = 10) {
 export async function storageTopFiles(path: string, depth = 4, limit = 10) {
   return request<StorageTopResponse>(
     `/api/storage/top-files?path=${encodeURIComponent(path)}&depth=${depth}&limit=${limit}`
+  );
+}
+
+export async function storageAnalyze(
+  path: string,
+  depth = 4,
+  limit = 20,
+  oldDays = 180,
+  minSize = 1024 * 1024
+) {
+  return request<StorageAnalysis>(
+    `/api/storage/analyze?path=${encodeURIComponent(path)}&depth=${depth}&limit=${limit}&old_days=${oldDays}&min_size=${minSize}`
   );
 }
 

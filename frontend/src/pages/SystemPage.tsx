@@ -2,20 +2,17 @@ import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 
 import {
-  storageTopFiles,
-  storageTopFolders,
   systemCpu,
   systemDisk,
   systemMemory,
   systemProcesses,
-  type StorageEntry,
-  type StorageTopResponse,
   type SystemCpuMetric,
   type SystemDiskMetric,
   type SystemMemoryMetric,
   type SystemProcess,
 } from "../api/client";
 import { Spinner } from "../components/Spinner";
+import { StorageAnalyzer } from "../components/StorageAnalyzer";
 import type { ToastKind } from "../components/Toast";
 
 type SystemPageProps = {
@@ -51,13 +48,7 @@ export function SystemPage({ setToast }: SystemPageProps) {
   const [memory, setMemory] = useState<SystemMemoryMetric | null>(null);
   const [disk, setDisk] = useState<SystemDiskMetric | null>(null);
   const [processes, setProcesses] = useState<SystemProcess[]>([]);
-  const [topFolders, setTopFolders] = useState<StorageTopResponse | null>(null);
-  const [topFiles, setTopFiles] = useState<StorageTopResponse | null>(null);
 
-  const [scanPathDraft, setScanPathDraft] = useState("/");
-  const [scanPath, setScanPath] = useState("/");
-  const [depth, setDepth] = useState(4);
-  const [limit, setLimit] = useState(10);
   const [refreshSeconds, setRefreshSeconds] = useState(5);
   const [processServerSort, setProcessServerSort] = useState<"cpu" | "memory">("cpu");
   const [tableSortKey, setTableSortKey] = useState<SortKey>("cpu_percent");
@@ -68,21 +59,17 @@ export function SystemPage({ setToast }: SystemPageProps) {
       if (showLoader) setLoading(true);
       else setRefreshing(true);
 
-      const [cpuData, memoryData, diskData, processData, foldersData, filesData] = await Promise.all([
+      const [cpuData, memoryData, diskData, processData] = await Promise.all([
         systemCpu(),
         systemMemory(),
         systemDisk(),
         systemProcesses(20, processServerSort),
-        storageTopFolders(scanPath, depth, limit),
-        storageTopFiles(scanPath, depth, limit),
       ]);
 
       setCpu(cpuData);
       setMemory(memoryData);
       setDisk(diskData);
       setProcesses(processData.items);
-      setTopFolders(foldersData);
-      setTopFiles(filesData);
       setLastUpdated(Date.now());
     } catch (err: unknown) {
       setToast(String(err), "error");
@@ -100,7 +87,7 @@ export function SystemPage({ setToast }: SystemPageProps) {
       refreshData(false).catch((err: unknown) => setToast(String(err), "error"));
     }, everyMs);
     return () => clearInterval(intervalId);
-  }, [scanPath, depth, limit, refreshSeconds, processServerSort]);
+  }, [refreshSeconds, processServerSort]);
 
   const sortedProcesses = useMemo(() => {
     const rows = [...processes];
@@ -114,20 +101,6 @@ export function SystemPage({ setToast }: SystemPageProps) {
     });
     return rows;
   }, [processes, tableSortKey, tableSortDir]);
-
-  const foldersMax = useMemo(
-    () => Math.max(...(topFolders?.items.map((entry) => entry.size) ?? [1])),
-    [topFolders]
-  );
-
-  function applyScanPath() {
-    const next = scanPathDraft.trim();
-    if (!next) {
-      setToast("Scan path cannot be empty", "warning");
-      return;
-    }
-    setScanPath(next);
-  }
 
   function toggleTableSort(nextKey: SortKey) {
     if (tableSortKey === nextKey) {
@@ -230,100 +203,7 @@ export function SystemPage({ setToast }: SystemPageProps) {
           </div>
 
           <div className="system-sections-grid">
-            <div className="card">
-              <div className="card-header">
-                <div>
-                  <div className="card-title">Storage Analyzer</div>
-                  <div className="card-subtitle">Top folders and files</div>
-                </div>
-                <div className="toolbar">
-                  <label className="inline-field inline-field-wide">
-                    <span>Path</span>
-                    <input
-                      value={scanPathDraft}
-                      onChange={(e) => setScanPathDraft(e.target.value)}
-                      placeholder="/home"
-                    />
-                  </label>
-                  <label className="inline-field">
-                    <span>Depth</span>
-                    <input
-                      value={depth}
-                      type="number"
-                      min={1}
-                      max={16}
-                      onChange={(e) => setDepth(Number(e.target.value || 4))}
-                    />
-                  </label>
-                  <label className="inline-field">
-                    <span>Limit</span>
-                    <input
-                      value={limit}
-                      type="number"
-                      min={1}
-                      max={50}
-                      onChange={(e) => setLimit(Number(e.target.value || 10))}
-                    />
-                  </label>
-                  <button onClick={applyScanPath}>Scan</button>
-                </div>
-              </div>
-              <div className="card-body">
-                <p className="section-label">Top folders</p>
-                <div className="bars-list">
-                  {(topFolders?.items ?? []).map((entry: StorageEntry) => {
-                    const ratio = foldersMax > 0 ? (entry.size / foldersMax) * 100 : 0;
-                    return (
-                      <div key={entry.path} className="bar-row">
-                        <div className="bar-row-meta">
-                          <span className="truncate" title={entry.path}>{entry.path}</span>
-                          <span className="mono">{formatBytes(entry.size)}</span>
-                        </div>
-                        <div className="progress-track">
-                          <div className="progress-bar success" style={{ width: `${ratio}%` }} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {(topFolders?.items.length ?? 0) === 0 ? (
-                    <div className="empty-state" style={{ padding: "16px 8px" }}>
-                      <span className="empty-state-desc">No folder data yet</span>
-                    </div>
-                  ) : null}
-                </div>
-
-                <p className="section-label" style={{ marginTop: 14 }}>Top files</p>
-                <div className="table-wrap">
-                  <table className="table">
-                    <thead>
-                      <tr>
-                        <th>Path</th>
-                        <th>Size</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(topFiles?.items ?? []).map((entry) => (
-                        <tr key={entry.path}>
-                          <td className="truncate" title={entry.path}>{entry.path}</td>
-                          <td className="mono">{formatBytes(entry.size)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="system-meta-row">
-                  <span className={`badge ${(topFolders?.meta.partial || topFiles?.meta.partial) ? "warning" : "success"}`}>
-                    {(topFolders?.meta.partial || topFiles?.meta.partial) ? "partial scan" : "complete"}
-                  </span>
-                  <span className="muted">
-                    {topFolders?.meta.from_cache || topFiles?.meta.from_cache ? "cache hit" : "fresh scan"}
-                  </span>
-                  {topFolders?.meta.stop_reason ? (
-                    <span className="text-warning mono">{topFolders.meta.stop_reason}</span>
-                  ) : null}
-                </div>
-              </div>
-            </div>
+            <StorageAnalyzer setToast={setToast} />
 
             <div className="card">
               <div className="card-header">

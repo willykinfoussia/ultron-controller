@@ -27,6 +27,12 @@ class Settings(BaseSettings):
     storage_exclude_system_paths: bool = True
     storage_max_path_length: int = 2048
 
+    storage_analyze_old_days: int = 180
+    storage_analyze_min_file_size: int = 1024 * 1024
+    storage_dup_min_size_bytes: int = 1024 * 1024
+    storage_dup_max_hashes: int = 500
+    storage_analyze_hash_budget_sec: float = 4.0
+
     hermes_api_base_url: str = "http://127.0.0.1:8642"
     hermes_api_key: str = "hermes-ultron-api-server"
     hermes_api_timeout_sec: float = 120.0
