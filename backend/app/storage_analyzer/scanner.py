@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import time
+from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -21,6 +22,8 @@ class WalkResult:
     path: str
     records: list[FileRecord] = field(default_factory=list)
     folder_sizes: dict[str, int] = field(default_factory=dict)
+    dirs_by_parent: dict[str, list[str]] = field(default_factory=dict)
+    files_by_parent: dict[str, list[tuple[str, int]]] = field(default_factory=dict)
     entries_visited: int = 0
     permission_denied: int = 0
     partial: bool = False
@@ -29,23 +32,37 @@ class WalkResult:
     generated_at: int = 0
 
 
+def _norm_path(path: Path | str) -> str:
+    return Path(path).as_posix()
+
+
 def _cut_top(items: dict[str, int], limit: int) -> list[dict]:
     top = sorted(items.items(), key=lambda row: row[1], reverse=True)[:limit]
     return [{"path": path, "size": int(size)} for path, size in top]
 
 
 def _add_to_ancestors(
-    folder_sizes: dict[str, int], root: Path, file_parent: Path, file_size: int, depth: int
+    folder_sizes: dict[str, int], root: Path, file_parent: Path, file_size: int
 ) -> None:
     current = file_parent
-    for _ in range(depth + 1):
-        folder_sizes[str(current)] = folder_sizes.get(str(current), 0) + file_size
-        if current == root:
+    root_key = _norm_path(root)
+    while True:
+        key = _norm_path(current)
+        folder_sizes[key] = folder_sizes.get(key, 0) + file_size
+        if key == root_key:
             break
         parent = current.parent
         if parent == current:
             break
         current = parent
+
+
+def _register_dir_child(dirs_by_parent: dict[str, list[str]], parent: Path, child: Path) -> None:
+    parent_key = _norm_path(parent)
+    child_key = _norm_path(child)
+    children = dirs_by_parent.setdefault(parent_key, [])
+    if child_key not in children:
+        children.append(child_key)
 
 
 def walk_records(
@@ -57,8 +74,11 @@ def walk_records(
     exclude_system_paths: bool = True,
 ) -> WalkResult:
     start = time.perf_counter()
+    root_key = _norm_path(root_path)
     stack: list[tuple[Path, int]] = [(root_path, 0)]
-    folder_sizes: dict[str, int] = {str(root_path): 0}
+    folder_sizes: dict[str, int] = {root_key: 0}
+    dirs_by_parent: dict[str, list[str]] = defaultdict(list)
+    files_by_parent: dict[str, list[tuple[str, int]]] = defaultdict(list)
     records: list[FileRecord] = []
     entries_visited = 0
     permission_denied = 0
@@ -94,7 +114,9 @@ def walk_records(
                         if entry.is_file(follow_symlinks=follow_symlinks):
                             stat = entry.stat(follow_symlinks=follow_symlinks)
                             size = int(stat.st_size)
-                            path_str = str(Path(entry.path))
+                            file_path = Path(entry.path)
+                            path_str = _norm_path(file_path)
+                            parent_key = _norm_path(file_path.parent)
                             records.append(
                                 FileRecord(
                                     path=path_str,
@@ -103,12 +125,12 @@ def walk_records(
                                     atime=float(stat.st_atime),
                                 )
                             )
+                            files_by_parent[parent_key].append((path_str, size))
                             _add_to_ancestors(
                                 folder_sizes=folder_sizes,
                                 root=root_path,
-                                file_parent=Path(entry.path).parent,
+                                file_parent=file_path.parent,
                                 file_size=size,
-                                depth=depth,
                             )
                             continue
 
@@ -116,6 +138,9 @@ def walk_records(
                             path = Path(entry.path)
                             if exclude_system_paths and is_excluded_system_path(path):
                                 continue
+                            child_key = _norm_path(path)
+                            folder_sizes.setdefault(child_key, 0)
+                            _register_dir_child(dirs_by_parent, current_dir, path)
                             stack.append((path, depth + 1))
                     except (PermissionError, FileNotFoundError, OSError):
                         permission_denied += 1
@@ -129,9 +154,11 @@ def walk_records(
 
     elapsed_ms = int((time.perf_counter() - start) * 1000)
     return WalkResult(
-        path=str(root_path),
+        path=root_key,
         records=records,
         folder_sizes=folder_sizes,
+        dirs_by_parent=dict(dirs_by_parent),
+        files_by_parent=dict(files_by_parent),
         entries_visited=entries_visited,
         permission_denied=permission_denied,
         partial=partial,

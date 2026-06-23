@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 
 import { storageAnalyze, type FileInsight, type StorageAnalysis } from "../api/client";
 import { Spinner } from "../components/Spinner";
+import { StorageFolderBrowser } from "../components/StorageFolderBrowser";
 import { TabBarWithBadges } from "../components/TabBarWithBadges";
 import type { ToastKind } from "../components/Toast";
 
@@ -256,11 +257,6 @@ export function StorageAnalyzer({ setToast }: StorageAnalyzerProps) {
     [analysis]
   );
 
-  const foldersMax = useMemo(
-    () => Math.max(...(analysis?.top_folders.map((entry) => entry.size) ?? [1])),
-    [analysis]
-  );
-
   return (
     <div className="card storage-analyzer">
       <div className="card-header storage-analyzer-header">
@@ -380,30 +376,18 @@ export function StorageAnalyzer({ setToast }: StorageAnalyzerProps) {
             {activeTab === "overview" ? (
               <div className="storage-tab-panel">
                 <CategoryDonut analysis={analysis} />
-                <p className="section-label">Top folders</p>
-                <div className="bars-list">
-                  {analysis.top_folders.map((entry) => {
-                    const ratio = foldersMax > 0 ? (entry.size / foldersMax) * 100 : 0;
-                    return (
-                      <div key={entry.path} className="bar-row">
-                        <div className="bar-row-meta">
-                          <span className="truncate" title={entry.path}>
-                            {entry.path}
-                          </span>
-                          <span className="mono">{formatBytes(entry.size)}</span>
-                        </div>
-                        <div className="progress-track">
-                          <motion.div
-                            className="progress-bar success"
-                            initial={{ width: 0 }}
-                            animate={{ width: `${ratio}%` }}
-                            transition={{ duration: 0.35 }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                {analysis.browse ? (
+                  <StorageFolderBrowser
+                    browse={analysis.browse}
+                    limit={limit}
+                    partial={analysis.partial}
+                    setToast={setToast}
+                  />
+                ) : (
+                  <div className="empty-state" style={{ padding: "16px 8px" }}>
+                    <span className="empty-state-desc">Re-run analysis to enable folder navigation</span>
+                  </div>
+                )}
               </div>
             ) : null}
 

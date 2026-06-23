@@ -150,6 +150,18 @@ export type StorageAnalysisSummary = {
   top_category: string;
 };
 
+export type BrowseEntry = {
+  path: string;
+  name: string;
+  kind: "dir" | "file";
+  size: number;
+};
+
+export type StorageBrowseIndex = {
+  root: string;
+  entries_by_parent: Record<string, BrowseEntry[]>;
+};
+
 export type StorageAnalysis = {
   status: "ok" | "partial";
   path: string;
@@ -159,6 +171,7 @@ export type StorageAnalysis = {
   junk: JunkEntry[];
   old_files: FileInsight[];
   duplicates: DuplicateGroup[];
+  browse: StorageBrowseIndex;
   top_folders: StorageEntry[];
   top_files: StorageEntry[];
   entries_visited: number;

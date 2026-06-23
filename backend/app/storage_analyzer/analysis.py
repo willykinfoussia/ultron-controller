@@ -5,6 +5,7 @@ import time
 from collections import defaultdict
 from dataclasses import dataclass
 
+from app.storage_analyzer.browse import build_browse_index
 from app.storage_analyzer.classifier import categorize, junk_kind
 from app.storage_analyzer.scanner import FileRecord, WalkResult
 
@@ -250,6 +251,7 @@ def analyze_records(
 
     recoverable_estimate = junk_size + duplicate_wasted
     top_category = categories[0]["category"] if categories else "other"
+    browse = build_browse_index(walk)
 
     return {
         "path": walk.path,
@@ -266,6 +268,7 @@ def analyze_records(
         "junk": junk_entries,
         "old_files": old_files,
         "duplicates": duplicate_groups[:limit],
+        "browse": browse,
         "top_folders": _top_from_folders(walk.folder_sizes, limit),
         "top_files": [{"path": row["path"], "size": row["size"]} for row in file_insights[:limit]],
         "entries_visited": walk.entries_visited,
