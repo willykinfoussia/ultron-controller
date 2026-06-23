@@ -1534,14 +1534,55 @@ textarea.editor {
 }
 
 /* ── Storage Analyzer ─────────────────────────────────────── */
+.storage-analyzer-header {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.storage-analyzer-subtitle {
+  max-width: none;
+  white-space: normal;
+}
+
+.storage-controls {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-wrap: wrap;
+  background: var(--surface-2);
+}
+
+.storage-controls-fields {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.storage-analyze-btn {
+  flex-shrink: 0;
+  min-width: 100px;
+  height: 34px;
+  font-weight: 600;
+}
+
+.storage-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+}
+
 .storage-analyzer .card-body {
   display: flex;
   flex-direction: column;
   gap: var(--sp-3);
-}
-
-.storage-toolbar {
-  flex-wrap: wrap;
 }
 
 .storage-summary-grid {

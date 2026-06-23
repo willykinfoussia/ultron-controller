@@ -263,14 +263,17 @@ export function StorageAnalyzer({ setToast }: StorageAnalyzerProps) {
 
   return (
     <div className="card storage-analyzer">
-      <div className="card-header">
-        <div>
+      <div className="card-header storage-analyzer-header">
+        <div className="storage-analyzer-heading">
           <div className="card-title">Storage Analyzer</div>
-          <div className="card-subtitle">
+          <div className="card-subtitle storage-analyzer-subtitle">
             Identify heavy files, junk, old data and duplicates — recommendations only
           </div>
         </div>
-        <div className="toolbar storage-toolbar">
+      </div>
+
+      <div className="storage-controls">
+        <div className="storage-controls-fields">
           <label className="inline-field inline-field-wide">
             <span>Path</span>
             <input
@@ -319,10 +322,10 @@ export function StorageAnalyzer({ setToast }: StorageAnalyzerProps) {
               onChange={(e) => setMinSizeMb(Number(e.target.value || 1))}
             />
           </label>
-          <button onClick={runAnalysis} disabled={loading}>
-            {loading ? "Analyzing..." : "Analyze"}
-          </button>
         </div>
+        <button className="primary storage-analyze-btn" onClick={runAnalysis} disabled={loading}>
+          {loading ? "Analyzing..." : "Analyze"}
+        </button>
       </div>
 
       <div className="card-body">
@@ -331,10 +334,13 @@ export function StorageAnalyzer({ setToast }: StorageAnalyzerProps) {
             <Spinner size="lg" />
           </div>
         ) : !analysis ? (
-          <div className="empty-state">
+          <div className="empty-state storage-empty-state">
             <span className="empty-state-desc">
               Run an analysis to discover what is using disk space and what can be cleaned up
             </span>
+            <button className="primary" onClick={runAnalysis} disabled={loading}>
+              Analyze
+            </button>
           </div>
         ) : (
           <>
