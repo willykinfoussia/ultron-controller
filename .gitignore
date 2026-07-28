@@ -16,6 +16,7 @@ __pycache__/
 htmlcov/
 .tox/
 .nox/
+backend/data/portfolios.json
 
 # ------------------------------
 # Node / Vite (frontend)

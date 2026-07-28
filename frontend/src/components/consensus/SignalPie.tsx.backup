@@ -1,0 +1,190 @@
+import React from 'react';
+
+// Define the signal types
+export type SignalType = 'Buy' | 'Sell' | 'Hold' | 'Neutral';
+
+// Define the data shape for each signal segment
+export type SignalData = {
+  type: SignalType;
+  count: number;
+  percentage: number;
+};
+
+// Define the props for the SignalPie component
+export interface SignalPieProps {
+  /** Data for each signal type */
+  data: SignalData[];
+  /** Total number of methods (optional, can be derived from data) */
+  totalMethods?: number;
+  /** Overall consensus score (optional, e.g., a calculated score from -100 to 100) */
+  consensusScore?: number;
+  /** Verdict text to display in the center (optional) */
+  verdict?: string;
+  /** Loading state */
+  isLoading?: boolean;
+  /** Whether there is no data to display */
+  isEmpty?: boolean;
+}
+
+const SignalPie: React.FC<SignalPieProps> = ({
+  data,
+  totalMethods,
+  consensusScore,
+  verdict,
+  isLoading = false,
+  isEmpty = false,
+}) => {
+  // Define colors for each signal type
+  const colors: Record<SignalType, string> = {
+    Buy: '#10b981', // green
+    Sell: '#ef4444', // red
+    Hold: '#eab308', // yellow
+    Neutral: '#6b7280', // gray
+  };
+
+  // Calculate total if not provided
+  const total = totalMethods ?? data.reduce((sum, item) => sum + item.count, 0);
+
+  // Calculate angles for each segment (in degrees)
+  const getAngle = (percentage: number) => (percentage / 100) * 360;
+
+  // Generate the path data for a pie segment
+  const getPathData = (startAngle: number, endAngle: number, radius: number) => {
+    const startX = radius * Math.cos(((startAngle - 90) * Math.PI) / 180);
+    const startY = radius * Math.sin(((startAngle - 90) * Math.PI) / 180);
+    const endX = radius * Math.cos(((endAngle - 90) * Math.PI) / 180);
+    const endY = radius * Math.sin(((endAngle - 9 - 90) * Math.PI) / 180);
+    const largeArc = endAngle - 90) * Math.PI) / 180);
+    const largeArc = endAngle - startAngle > 180 ? 1 : 0;
+    const d = [
+      `M 0 0`,
+      `L ${startX} ${startY}`,
+      `A ${radius} ${radius} 0 ${largeArc} 1 ${endX} ${endY}`,
+      'Z',
+    ].join(' ');
+    return d;
+  };
+
+  // Handle empty or loading states
+  if (isLoading) {
+    return (
+      <div className="signal-pie-loader" aria-label="Loading signal pie chart">
+        <div className="spinner" />
+      </div>
+    );
+  }
+
+  if (isEmpty || !data || data.length === 0 || total === 0) {
+    return (
+      <div className="signal-pie-empty" aria-label="No signal data available">
+        <div className="empty-icon">📊</div>
+        <p>No signal data available</p>
+      </div>
+    );
+  }
+
+  // Sort data by type for consistent ordering (optional)
+  const sortedData = [...data].sort((a, b) => 
+    ['Buy', 'Sell', 'Hold', 'Neutral'].indexOf(a.type) - ['Buy', 'Sell', 'Hold', 'Neutral'].indexOf(b.type)
+  );
+
+  // Calculate cumulative angles for each segment
+  let currentAngle = 0;
+  const segments = sortedData.map((item) => {
+    const angle = getAngle(item.percentage);
+    const segment = {
+      ...item,
+      startAngle: currentAngle,
+      endAngle: currentAngle + angle,
+    };
+    currentAngle += angle;
+    return segment;
+  });
+
+  return (
+    <div className="signal-pie-container" role="img" aria-label="Signal distribution pie chart">
+      <svg 
+        className="signal-pie-svg" 
+        viewBox="-100 -100 200 200"
+        role="presentation"
+      >
+        {/* Render each segment as a path */}
+        {segments.map((segment, index) => (
+          <path
+            key={index}
+            d={getPathData(segment.startAngle, segment.endAngle, 90)}
+            fill={colors[segment.type as SignalType]}
+            className="signal-pie-slice"
+          >
+            <title>
+              {segment.type}: {segment.count} ({segment.percentage.toFixed(1)}%)
+            </title>
+          </path>
+        ))}
+        
+        {/* Center circle for the hole */}
+        <circle 
+          cx="0" 
+          cy="0" 
+          r="50" 
+          fill="white" 
+          className="signal-pie-hole"
+        />
+        
+        {/* Center content */}
+        <g className="signal-pie-center">
+          {consensusScore !== undefined && (
+            <text 
+              x="0" 
+              y="-10" 
+              textAnchor="middle" 
+              className="signal-pie-score"
+            >
+              {Math.round(consensusScore)}
+            </text>
+          )}
+          {verdict && (
+            <text 
+              x="0" 
+              y="10" 
+              textAnchor="middle" 
+              className="signal-pie-verdict"
+            >
+              {verdict}
+            </text>
+          )}
+          {totalMethods !== undefined && (
+            <text 
+              x="0" 
+              y="30" 
+              textAnchor="middle" 
+              className="signal-pie-total"
+            >
+              {totalMethods} methods
+            </text>
+          )}
+        </g>
+      </svg>
+      
+      {/* Legend */}
+      <div className="signal-pie-legend">
+        {segments.map((segment, index) => (
+          <div 
+            key={index} 
+            className="signal-pie-legend-item"
+          >
+            <span 
+              className="signal-pie-legend-color"
+              style={{ backgroundColor: colors[segment.type as SignalType] }}
+            ></span>
+            <span className="signal-pie-legend-label">
+              {segment.type}: {segment.count} ({segment.percentage.toFixed(1)}%)
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+export default SignalPie;

@@ -26,6 +26,7 @@ from app.core.config import Settings, get_settings
 from app.core.version import get_app_version
 from app.services.hermes_api_client import HermesApiClient
 from app.services.telegram_client_service import TelegramClientService
+from app.api.portfolio import router as portfolio_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
@@ -81,9 +82,9 @@ app.include_router(sessions_router)
 app.include_router(search_router)
 app.include_router(system_router)
 app.include_router(kanban_router)
-app.include_router(storage_router)
 app.include_router(gws_router)
 app.include_router(telegram_router)
+app.include_router(portfolio_router, prefix="/api/portfolio", tags=["portfolio"])
 
 @app.get("/api/version", include_in_schema=False)
 async def version() -> dict:
