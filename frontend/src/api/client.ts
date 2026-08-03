@@ -189,7 +189,7 @@ export type StorageAnalysis = {
   };
 };
 
-export async function request<T>(input: string, init?: RequestInit): Promise<T> {
+async function request<T>(input: string, init?: RequestInit): Promise<T> {
   const response = await fetch(input, init);
   const raw = await response.text();
   const contentType = response.headers.get("content-type") ?? "";

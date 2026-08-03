@@ -14,16 +14,15 @@ import { SettingsPage } from "./pages/SettingsPage";
 import { SystemPage } from "./pages/SystemPage";
 import { TelegramIcon } from "./components/TelegramIcon";
 import { TelegramPage } from "./pages/TelegramPage";
-import PortfolioPage from "./pages/Portfolio";
 
 /* ── Types ──────────────────────────────────────────────── */
-type TabId = "openviking" | "memory" | "sessions" | "search" | "system" | "hermes" | "kanban" | "telegram" | "settings" | "portfolio";
+type TabId = "openviking" | "memory" | "sessions" | "search" | "system" | "hermes" | "kanban" | "telegram" | "settings";
 type Theme  = "dark" | "light";
 type AccentId = "indigo" | "blue" | "cyan" | "emerald" | "rose" | "amber";
 type HermesLedStatus = "up_to_date" | "outdated" | "unknown";
 
 /* ── Sections (sidebar groups) ──────────────────────────── */
-type SectionId = "knowledge" | "activity" | "system" | "trading";
+type SectionId = "knowledge" | "activity" | "system";
 
 interface NavItem {
   id: TabId;
@@ -48,7 +47,6 @@ const NAV: NavItem[] = [
   { id: "telegram",   label: "Telegram",   icon: "telegram", section: "activity" },
   { id: "system",     label: "System",     icon: "🖥️", section: "system" },
   { id: "settings",   label: "Settings",   icon: "⚙️", section: "system" },
-  { id: "portfolio",  label: "Portfolio",  icon: "💰", section: "activity" },
 ];
 
 /* ── Accent presets ──────────────────────────────────────── */
@@ -222,7 +220,6 @@ export default function App() {
     if (activeTab === "hermes")     return <HermesPage {...props} />;
     if (activeTab === "kanban")     return <KanbanBoardPage {...props} />;
     if (activeTab === "telegram")   return <TelegramPage {...props} />;
-    if (activeTab === "portfolio")  return <PortfolioPage setToast={setToast} />;
     if (activeTab === "settings")   return (
       <SettingsPage
         theme={theme}

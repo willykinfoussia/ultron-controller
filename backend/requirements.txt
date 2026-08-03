@@ -5,4 +5,3 @@ pydantic-settings>=2.4.0
 psutil>=7.0.0
 python-multipart>=0.0.9
 telethon>=1.40.0
-yfinance>=0.2.0
